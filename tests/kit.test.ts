@@ -1,0 +1,204 @@
+import { describe, it, expect } from "vitest";
+import { createElement as h } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { MemoryRouter } from "react-router-dom";
+import {
+  DataGrid,
+  PageHeader,
+  StatusBadge,
+  Tabs,
+  columnKind,
+  connectorKey,
+  formatValue,
+  inferKind,
+  toStatus,
+} from "../apps/web/src/kit/index.js";
+import {
+  activeSection,
+  childActive,
+  paletteSources,
+  secondaryNav,
+} from "../apps/web/src/shell/nav.js";
+import { paths } from "../apps/web/src/paths.js";
+import { chatIsActive } from "../apps/web/src/areas/analyst/launcher.js";
+import {
+  collapseActivity,
+  describeActivity,
+} from "../packages/shared/src/index.js";
+
+const render = (node: any, url = "/") =>
+  renderToStaticMarkup(h(MemoryRouter, { initialEntries: [url] }, node));
+
+describe("workspace UI kit", () => {
+  it("renders only a window of a large grid, with typed, formatted cells", () => {
+    const rows = Array.from({ length: 10000 }, (_, i) => ({
+      id: i,
+      amount: i * 1000.5,
+      note: i % 2 ? null : { tag: "x" },
+    }));
+    const html = render(
+      h(DataGrid, {
+        label: "Orders",
+        rows,
+        columns: [
+          { key: "id", type: "BIGINT" },
+          { key: "amount", type: "DOUBLE" },
+          { key: "note", type: "JSON" },
+        ],
+      }),
+    );
+    const rendered = html.match(/role="row"/g)!.length;
+    expect(rendered).toBeGreaterThan(5);
+    expect(rendered).toBeLessThan(60);
+    expect(html).toContain('aria-rowcount="10001"');
+    expect(html).toContain("1,000.5");
+    expect(html).toContain("{&quot;tag&quot;:&quot;x&quot;}");
+    expect(html).toContain('class="hf-null"');
+  });
+  it("maps types, statuses and connectors", () => {
+    expect(columnKind("TIMESTAMP WITH TIME ZONE")).toBe("timestamp");
+    expect(columnKind("DECIMAL(18,3)")).toBe("number");
+    expect(columnKind("STRUCT(a INTEGER)")).toBe("json");
+    expect(inferKind(["2026-01-02", null])).toBe("date");
+    expect(formatValue(null, "string")).toBeNull();
+    expect(toStatus("awaiting_review")).toBe("review");
+    expect(toStatus("retrying")).toBe("failed");
+    expect(connectorKey("PostgreSQL")).toBe("postgres");
+    expect(connectorKey(undefined, "Stripe")).toBe("stripe");
+  });
+  it("renders ARIA tabs synced to the URL and a titled page header", () => {
+    const html = render(
+      h(Tabs, {
+        label: "Dataset",
+        items: [
+          { id: "preview", label: "Preview" },
+          { id: "schema", label: "Schema", count: 12 },
+        ],
+      }),
+      "/data/datasets/d1?tab=schema",
+    );
+    expect(html).toContain('role="tablist"');
+    expect(html).toMatch(/id="tab-tab-schema"[^>]*aria-selected="true"/);
+    const header = render(
+      h(PageHeader, {
+        title: "Orders",
+        breadcrumbs: [{ label: "Data", to: "/data" }, { label: "Orders" }],
+        actions: h(StatusBadge, { status: "healthy" }),
+      }),
+    );
+    expect(header).toContain("<h1>Orders</h1>");
+    expect(header).toContain('aria-current="page"');
+    expect(header).toContain("Healthy");
+  });
+  it("keeps nested routes in their sidebar section", () => {
+    expect(activeSection("/")).toBe("home");
+    expect(activeSection("/data/datasets/x")).toBe("data");
+    expect(activeSection("/records/abc")).toBe("ontology");
+    expect(activeSection("/runs/1")).toBe("analyst");
+    // Removed sections: SQL, Pipelines, Activity and Dashboards have no
+    // sidebar entry.
+    expect(activeSection("/explore")).toBeUndefined();
+    expect(activeSection("/pipelines")).toBeUndefined();
+    expect(activeSection("/activity")).toBeUndefined();
+    expect(activeSection("/dashboards")).toBeUndefined();
+    expect(childActive("/data", { to: "/data", label: "", end: true })).toBe(
+      true,
+    );
+    expect(
+      childActive("/data/connections", { to: "/data", label: "", end: true }),
+    ).toBe(false);
+  });
+  it("keeps Settings as the only secondary section", () => {
+    expect(secondaryNav.map((n) => n.id)).toEqual(["settings"]);
+    // Area path helpers merge into one `paths`.
+    expect(paths.dataset("a b", "schema")).toBe(
+      "/data/datasets/a%20b?tab=schema",
+    );
+    expect(paths.thread("r1")).toBe("/analyst/r1");
+  });
+  it("finds each chat once, by its first question", () => {
+    const chats = paletteSources.find((s) => s.id === "threads")!;
+    const run = (id: string, data: Record<string, unknown>) =>
+      ({
+        id,
+        kind: "run",
+        name: id,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        data,
+      }) as any;
+    expect(chats.label).toBe("Chats");
+    const first = run("r1", {
+      goal: "Which accounts churned?",
+      threadId: "r1",
+    });
+    expect(chats.filter!(first)).toBe(true);
+    expect(chats.title!(first)).toBe("Which accounts churned?");
+    expect(chats.href(first)).toBe("/analyst/r1");
+    // A follow-up belongs to its chat; setup runs are not chats; a run from
+    // before chats had ids is its own chat.
+    const followUp = run("r2", { goal: "And last month?", threadId: "r1" });
+    expect(chats.filter!(followUp)).toBe(false);
+    expect(chats.href(followUp)).toBe("/analyst/r1");
+    expect(chats.filter!(run("s1", { task: "onboarding_build" }))).toBe(false);
+    expect(chats.filter!(run("r0", { goal: "Older question" }))).toBe(true);
+    // The sidebar marks chats still being answered.
+    expect(chatIsActive({ status: "running" })).toBe(true);
+    expect(chatIsActive({ status: "queued" })).toBe(true);
+    expect(chatIsActive({ status: "awaiting_review" })).toBe(false);
+    expect(chatIsActive({ status: "succeeded" })).toBe(false);
+  });
+  it("describes activity the same way everywhere", () => {
+    const at = (m: number) =>
+      new Date(Date.UTC(2026, 0, 1, 0, m)).toISOString();
+    const job = (id: string, name: string, data: object, m: number) => ({
+      id,
+      kind: "job",
+      name,
+      updatedAt: at(m),
+      data,
+    });
+    const setup = describeActivity({
+      id: "r1",
+      kind: "run",
+      name: "Build",
+      updatedAt: at(1),
+      data: { task: "onboarding_build", status: "succeeded" },
+    });
+    expect(setup).toMatchObject({
+      kind: "setup",
+      label: "Setup",
+      title: "Built your workspace",
+    });
+    expect(
+      describeActivity(
+        job(
+          "j0",
+          "Prepare local",
+          {
+            type: "provider_prepare",
+            status: "running",
+            settings: { provider: "local" },
+          },
+          0,
+        ),
+      ).title,
+    ).toBe("Preparing the local AI model");
+    const feed = [
+      job("j3", "Run Users", { type: "pipeline", status: "queued" }, 3),
+      job("j2", "Run Accounts", { type: "pipeline", status: "succeeded" }, 2),
+      job("j1", "Run Users", { type: "pipeline", status: "succeeded" }, 1),
+    ].map(describeActivity);
+    expect(feed[0]).toMatchObject({
+      title: "Users",
+      label: "Pipeline build",
+    });
+    const all = collapseActivity(feed);
+    expect(all.map((a) => [a.id, a.repeats])).toEqual([
+      ["j3", 1],
+      ["j2", 0],
+    ]);
+    // A timeline keeps history apart from back-to-back repeats.
+    expect(collapseActivity(feed, "adjacent")).toHaveLength(3);
+  });
+});

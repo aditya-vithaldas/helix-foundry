@@ -1,0 +1,18 @@
+node_modules
+.env
+.env.*
+!.env.example
+.data
+coverage
+playwright-report
+test-results
+apps/web/dist
+packages/*/dist
+*.tgz
+*.log
+.DS_Store
+
+# Local backups contain the encryption key (scripts/backup.sh)
+backups/
+*.bak
+.claude/launch.json
