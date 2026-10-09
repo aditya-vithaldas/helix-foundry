@@ -151,7 +151,6 @@ export default function Onboarding() {
   // again; confirming it finishes the build.
   const buildView =
     step === "review" &&
-    state.ontologyConfirmed &&
     !!run?.data.ontology &&
     run.data.status !== "awaiting_review";
   const stage = buildStage(run?.data.stage);
@@ -290,6 +289,12 @@ export default function Onboarding() {
                   ? "Build stopped"
                   : "Building your workspace"}
             </h1>
+            {run.data.status === "failed" && (
+              <p className="setup-intro" role="status">
+                Your workspace isn’t ready yet. Your connected sources and
+                imported data are still available.
+              </p>
+            )}
             {building && (
               // Continues the ontology scene: the ontology now feeds the apps.
               <div className="build-scene">

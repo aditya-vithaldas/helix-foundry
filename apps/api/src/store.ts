@@ -35,6 +35,11 @@ export function resource(
   };
 }
 export type Change = { put: Resource } | { delete: string };
+export type PublicationCounts = {
+  generation: string;
+  records: number;
+  relationships: number;
+};
 export interface Store {
   init(): Promise<void>;
   list(scope: string, kind?: string): Promise<Resource[]>;
@@ -42,6 +47,11 @@ export interface Store {
   commit(scope: string, version: number, changes: Change[]): Promise<boolean>;
   version(scope: string): Promise<number>;
   neighbors(scope: string, id: string): Promise<string[]>;
+  publicationCounts?(
+    scope: string,
+    generation?: string,
+    after?: string,
+  ): Promise<PublicationCounts | undefined>;
 }
 const anchor = (key: string) =>
   g().nWithLabelWhere("FoundryRecord", SourcePredicate.eq("key", key));
@@ -108,6 +118,65 @@ export class HelixStore implements Store {
     return (r.records || [])
       .filter((x: any) => x.doc)
       .map((x: any) => JSON.parse(x.doc)) as Resource[];
+  }
+  async publicationCounts(scope: string, generation?: string, after?: string) {
+    // Older running builds did not save their generation. Recover it only from
+    // an object created during this publication; never count an earlier build.
+    if (!generation) {
+      const first = await this.read(
+        readBatch()
+          .varAs(
+            "first",
+            g()
+              .nWithLabelWhere(
+                "FoundryRecord",
+                SourcePredicate.eq("scopeKind", scope + ":object"),
+              )
+              .limit(1)
+              .valueMap(["doc"]),
+          )
+          .returning(["first"]),
+      );
+      const object = first.first?.[0]?.doc && JSON.parse(first.first[0].doc);
+      if (!object || !after || object.createdAt < after) return;
+      generation = object.data.generation;
+    }
+    if (!generation) return;
+    const q = readBatch();
+    const result = await this.read(
+      q
+        .varAs(
+          "records",
+          g()
+            .nWithLabelWhere(
+              "FoundryRecord",
+              SourcePredicate.eq("scopeKind", scope + ":object"),
+            )
+            .where(Predicate.startsWith("key", scope + ":" + generation + "_"))
+            .count(),
+        )
+        .varAs(
+          "relationships",
+          g()
+            .nWithLabelWhere(
+              "FoundryRecord",
+              SourcePredicate.eq("scopeKind", scope + ":relation"),
+            )
+            .where(
+              Predicate.contains(
+                "doc",
+                '"generation":' + JSON.stringify(generation),
+              ),
+            )
+            .count(),
+        )
+        .returning(["records", "relationships"]),
+    );
+    return {
+      generation,
+      records: Number(result.records),
+      relationships: Number(result.relationships),
+    };
   }
   async get(scope: string, id: string) {
     const r = await this.read(
@@ -280,6 +349,22 @@ export class MemoryStore implements Store {
   }
   async get(s: string, id: string) {
     return structuredClone(this.rows.get(s + ":" + id));
+  }
+  async publicationCounts(scope: string, generation?: string, after?: string) {
+    const objects = await this.list(scope, "object");
+    if (!generation) {
+      const first = objects[0];
+      if (!first || !after || first.createdAt < after) return;
+      generation = first.data.generation;
+    }
+    if (!generation) return;
+    return {
+      generation,
+      records: objects.filter((o) => o.data.generation === generation).length,
+      relationships: (await this.list(scope, "relation")).filter(
+        (r) => r.data.generation === generation,
+      ).length,
+    };
   }
   async version(s: string) {
     return this.versions.get(s) || 0;
