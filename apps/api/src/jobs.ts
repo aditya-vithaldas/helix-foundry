@@ -32,8 +32,19 @@ export function startWorker(store: Store) {
       const workspaces = await store.list("global", "workspaceRef");
       for (const workspace of workspaces) {
         const scope = workspace.id;
+        const runs = await store.list(scope, "run");
+        // Setup validates and publishes immutable input versions. Scheduling a
+        // refresh here would invalidate its signature before it even starts.
+        const buildingSetup = runs.some(
+          (run) =>
+            run.data.task === "onboarding_build" &&
+            ["queued", "running"].includes(run.data.status),
+        );
         for (const source of await store.list(scope, "source"))
-          if (scheduledRefresh(source) || needsChangeRefresh(source)) {
+          if (
+            !buildingSetup &&
+            (scheduledRefresh(source) || needsChangeRefresh(source))
+          ) {
             await transaction(store, scope, async (tx) => {
               const s = await tx.get(source.id);
               if (!s || (!scheduledRefresh(s) && !needsChangeRefresh(s)))
@@ -65,14 +76,20 @@ export function startWorker(store: Store) {
               });
             });
           }
-        const runs = await store.list(scope, "run"),
-          jobs = await store.list(scope, "job");
+        const jobs = await store.list(scope, "job");
         const candidate = [...runs, ...jobs]
           .filter(
             (r) =>
-              (r.data.status === "queued" &&
+              !(
+                buildingSetup &&
+                r.kind === "job" &&
+                r.data.background &&
+                r.data.type === "sync"
+              ) &&
+              ((r.data.status === "queued" &&
                 (!r.data.retryAt || r.data.retryAt <= Date.now())) ||
-              (r.data.status === "running" && r.data.leaseUntil < Date.now()),
+                (r.data.status === "running" &&
+                  r.data.leaseUntil < Date.now())),
           )
           .sort(
             (a, b) =>
