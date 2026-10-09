@@ -3,6 +3,7 @@ import {
   assertOnboardingPublication,
 } from "./onboarding-state.js";
 import { effectiveObject } from "./context.js";
+import { stagingWriter } from "./staged-publication.js";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
@@ -1566,6 +1567,9 @@ export async function publishProposal(
     );
   }
   const identities = new Map<string, Map<string, string>>();
+  const writeStaged = stagingWriter(store, scope);
+  const pageSize = 1000;
+  const quote = (v: string) => '"' + v.replaceAll('"', '""') + '"';
   const manualObjects = await store.list(scope, "manualObject");
   const relationEdits = await store.list(scope, "relationEdit");
   const edits = new Map(
@@ -1583,15 +1587,18 @@ export async function publishProposal(
     assets.push(
       resource(scope, "objectType", type.name, { ...type, generation, typeId }),
     );
-    for (let offset = 0; offset < dataset.data.profile.rows; offset += 500) {
+    for (
+      let offset = 0;
+      offset < dataset.data.profile.rows;
+      offset += pageSize
+    ) {
       const r = await execute({
         mode: "query",
         scope,
         inputs: inputsFor([type.datasetId], map),
-        sql: `SELECT * FROM "${datasetTable(type.datasetId)}"`,
+        sql: `SELECT * FROM ${quote(datasetTable(type.datasetId))} ORDER BY ${quote(type.primaryKey)} LIMIT ${pageSize} OFFSET ${offset}`,
         version: randomUUID(),
-        offset,
-        limit: 500,
+        limit: pageSize,
       });
       const staged = r.rows.map((row) => {
         const key = String(row[type.primaryKey]),
@@ -1614,9 +1621,7 @@ export async function publishProposal(
         lookup.set(key, obj.id);
         return obj;
       });
-      await transaction(store, scope, async (tx) => {
-        staged.forEach((o) => tx.put(o));
-      });
+      await writeStaged(staged);
     }
   }
   for (const o of manualObjects) {
@@ -1633,45 +1638,50 @@ export async function publishProposal(
       await transaction(store, scope, async (tx) => tx.put(staged));
     }
   }
-  const quote = (v: string) => '"' + v.replaceAll('"', '""') + '"';
   for (const rel of bundle.relationships) {
     const fromType = bundle.ontology.find((o) => o.name === rel.fromType)!,
       toType = bundle.ontology.find((o) => o.name === rel.toType)!;
     const sql = `SELECT a.${quote(fromType.primaryKey)} AS from_key,b.${quote(toType.primaryKey)} AS to_key FROM ${quote(datasetTable(fromType.datasetId))} a JOIN ${quote(datasetTable(toType.datasetId))} b ON a.${quote(rel.fromColumn)}=b.${quote(rel.toColumn)}`;
-    let offset = 0,
-      total = Infinity;
+    const count = await execute({
+      mode: "query",
+      scope,
+      inputs: inputsFor([fromType.datasetId, toType.datasetId], map),
+      sql: `SELECT count(*) n FROM (${sql}) foundry_relationships`,
+      version: randomUUID(),
+      limit: 1,
+    });
+    const total = Number(count.rows[0].n);
+    let offset = 0;
     while (offset < total) {
       const r = await execute({
         mode: "query",
         scope,
         inputs: inputsFor([fromType.datasetId, toType.datasetId], map),
-        sql,
+        sql: `${sql} ORDER BY from_key, to_key LIMIT ${pageSize} OFFSET ${offset}`,
         version: randomUUID(),
-        offset,
-        limit: 500,
+        limit: pageSize,
       });
-      total = r.profile.rows;
-      await transaction(store, scope, async (tx) => {
-        for (const row of r.rows) {
-          const from = identities.get(rel.fromType)!.get(String(row.from_key)),
-            to = identities.get(rel.toType)!.get(String(row.to_key));
-          const edit =
-            from && to
-              ? edits.get(
-                  [
-                    from.slice(generation.length + 1),
-                    to.slice(generation.length + 1),
-                    rel.name,
-                  ].join(":"),
-                )
-              : undefined;
-          if (from && to && !edit)
-            tx.put(
-              resource(scope, "relation", rel.name, { from, to, generation }),
-            );
-        }
-      });
-      offset += 500;
+      const staged: Resource[] = [];
+      for (const row of r.rows) {
+        const from = identities.get(rel.fromType)!.get(String(row.from_key)),
+          to = identities.get(rel.toType)!.get(String(row.to_key));
+        const edit =
+          from && to
+            ? edits.get(
+                [
+                  from.slice(generation.length + 1),
+                  to.slice(generation.length + 1),
+                  rel.name,
+                ].join(":"),
+              )
+            : undefined;
+        if (from && to && !edit)
+          staged.push(
+            resource(scope, "relation", rel.name, { from, to, generation }),
+          );
+      }
+      await writeStaged(staged);
+      offset += pageSize;
     }
   }
   for (const edit of relationEdits) {
