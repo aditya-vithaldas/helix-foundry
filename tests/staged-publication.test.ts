@@ -46,3 +46,52 @@ it("propagates other failures instead of claiming publication succeeded", async 
   ).rejects.toThrow("storage unavailable");
   expect(await store.list("one", "object")).toEqual([]);
 });
+
+it("uses append staging only for scoped inactive generation records", async () => {
+  class AppendStore extends MemoryStore {
+    appended: unknown[] = [];
+    async stageRecords(scope: string, rows: unknown[]) {
+      this.appended.push({ scope, rows });
+    }
+  }
+  const store = new AppendStore();
+  const write = stagingWriter(store, "one", "fresh");
+  await write([
+    resource("one", "object", "one", { generation: "fresh" }, "fresh_one"),
+  ]);
+  expect(store.appended).toHaveLength(1);
+  await expect(
+    write([
+      resource(
+        "other",
+        "object",
+        "other",
+        { generation: "fresh" },
+        "fresh_other",
+      ),
+    ]),
+  ).rejects.toThrow("Invalid inactive");
+  await expect(
+    write([resource("one", "object", "old", { generation: "old" }, "old_one")]),
+  ).rejects.toThrow("Invalid inactive");
+  await store.commit("one", 0, [
+    {
+      put: resource(
+        "one",
+        "workspace",
+        "one",
+        { activeGeneration: "active" },
+        "workspace",
+      ),
+    },
+  ]);
+  await expect(
+    stagingWriter(
+      store,
+      "one",
+      "active",
+    )([
+      resource("one", "object", "one", { generation: "active" }, "active_one"),
+    ]),
+  ).rejects.toThrow("active generation");
+});

@@ -47,6 +47,7 @@ export interface Store {
   commit(scope: string, version: number, changes: Change[]): Promise<boolean>;
   version(scope: string): Promise<number>;
   neighbors(scope: string, id: string): Promise<string[]>;
+  stageRecords?(scope: string, records: Resource[]): Promise<void>;
   publicationCounts?(
     scope: string,
     generation?: string,
@@ -188,6 +189,40 @@ export class HelixStore implements Store {
       ? (JSON.parse(r.records[0].doc) as Resource)
       : undefined;
   }
+  // Fresh, inactive generation records need inserts only. Ordinary edits and
+  // final generation activation continue to use revision-guarded commit().
+  async stageRecords(scope: string, records: Resource[]) {
+    if (!records.length) return;
+    let q = writeBatch();
+    for (const [i, record] of records.entries()) {
+      q = q.varAs(
+        "new" + i,
+        g().addN("FoundryRecord", {
+          key: scope + ":" + record.id,
+          scope,
+          scopeKind: scope + ":" + record.kind,
+          doc: JSON.stringify(record),
+        }),
+      );
+      if (record.kind === "relation") {
+        q = q
+          .varAs("from" + i, anchor(scope + ":" + record.data.from))
+          .varAs("to" + i, anchor(scope + ":" + record.data.to))
+          .varAs(
+            "edge" + i,
+            g()
+              .n(NodeRef.var("from" + i))
+              .addE("FoundryRelationship", NodeRef.var("to" + i), {
+                scope,
+                generation: record.data.generation,
+                name: record.name,
+                relationId: record.id,
+              }),
+          );
+      }
+    }
+    await this.write(q.returning(["new0"]));
+  }
   async version(scope: string) {
     const r = await this.read(
       readBatch()
@@ -214,9 +249,26 @@ export class HelixStore implements Store {
         ]),
       );
     }
-    const present = names.length
-      ? await this.read(existingQuery.returning(names))
-      : {};
+    let present: Record<string, any> = {};
+    if (names.length) {
+      try {
+        present = await this.read(existingQuery.returning(names));
+      } catch (error) {
+        // The pinned optimizer can reject independent indexed anchors in one
+        // read plan at large database sizes. Individual key lookups preserve
+        // upsert decisions and the atomic revision-guarded write below.
+        if (!String(error).includes("unsupported cascades plan")) throw error;
+        for (const [i, change] of changes.entries()) {
+          const id = "put" in change ? change.put.id : change.delete;
+          const result = await this.read(
+            readBatch()
+              .varAs("record", anchor(scope + ":" + id).valueMap(["key"]))
+              .returning(["record"]),
+          );
+          present["p" + i] = result.record;
+        }
+      }
+    }
     let q = writeBatch().varAs("clock", anchor(scope + ":__revision"));
     if (version === 0) {
       q = q.varAsIf(
