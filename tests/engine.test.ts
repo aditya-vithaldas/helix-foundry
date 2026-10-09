@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, mkdir, readdir, rm } from "node:fs/promises";
+import { DuckDBInstance } from "@duckdb/node-api";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execute } from "../services/executor/src/engine.js";
@@ -73,5 +74,35 @@ describe("isolated dataset execution", () => {
         dir,
       ),
     ).rejects.toThrow("Invalid storage");
+  });
+  it("profiles a snapshot larger than memory using writable, isolated scratch storage", async () => {
+    const path = join(dir, "incoming", "a", "large.parquet");
+    const fixture = await DuckDBInstance.create(":memory:");
+    const connection = await fixture.connect();
+    try {
+      await connection.run(
+        `COPY (SELECT i id, md5(i::VARCHAR) || repeat('x', 128) payload FROM range(1000000) t(i)) TO '${path.replaceAll("'", "''")}' (FORMAT PARQUET)`,
+      );
+    } finally {
+      connection.closeSync();
+      fixture.closeSync();
+    }
+    const before = process.env.DUCKDB_MEMORY;
+    process.env.DUCKDB_MEMORY = "128MB";
+    try {
+      const result = await execute(
+        { mode: "ingest", scope: "a", version: "large", file: "large.parquet" },
+        dir,
+      );
+      expect(result.profile.rows).toBe(1000000);
+      expect(result.profile.duplicateRows).toBe(0);
+      expect(
+        result.profile.columns.find((c) => c.name === "id")?.primaryKey,
+      ).toBe(true);
+      expect(await readdir(join(dir, "scratch"))).toEqual([]);
+    } finally {
+      if (before === undefined) delete process.env.DUCKDB_MEMORY;
+      else process.env.DUCKDB_MEMORY = before;
+    }
   });
 });
