@@ -8,6 +8,31 @@ import {
 } from "../apps/web/src/build-estimate.js";
 
 describe("publication measurements", () => {
+  it("uses confirmed batch counters instead of scanning the graph on each poll", async () => {
+    const counts = vi.fn();
+    const progress = {
+      generation: "fresh",
+      records: 500,
+      relationships: 0,
+      sampledAt: Date.now(),
+    };
+    const run = resource("one", "run", "build", {
+      status: "running",
+      stage: "publishing",
+      publicationGeneration: "fresh",
+      publicationProgress: progress,
+    });
+    expect(
+      await publicationProgress(
+        { publicationCounts: counts },
+        "one",
+        run,
+        resource("one", "proposal", "build"),
+        [],
+      ),
+    ).toEqual(progress);
+    expect(counts).not.toHaveBeenCalled();
+  });
   it("counts only the current workspace and generation, and refuses legacy counts from a previous build", async () => {
     const store = new MemoryStore();
     for (const scope of ["one", "two"])

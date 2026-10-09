@@ -14,6 +14,14 @@ export async function publicationProgress(
   proposal: Resource,
   datasets: Resource[],
 ) {
+  // New builds report committed batches directly. Avoid repeatedly scanning
+  // millions of staged nodes just to refresh the onboarding display.
+  if (
+    run.data.status === "running" &&
+    run.data.stage === "publishing" &&
+    run.data.publicationProgress?.generation === run.data.publicationGeneration
+  )
+    return run.data.publicationProgress;
   if (
     !store.publicationCounts ||
     run.data.stage !== "publishing" ||
