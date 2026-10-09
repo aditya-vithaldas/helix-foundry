@@ -5,7 +5,7 @@ import { queryDatasets } from "./datasets.js";
 import { q, lit } from "./discovery.js";
 import { digest } from "./security.js";
 import { resource, transaction, type Store } from "./store.js";
-import { measureChange, showcaseWindow } from "./showcase-calculations.js";
+import { coversWeek, measureChange, showcaseWindow } from "./showcase-calculations.js";
 
 export const SHOWCASE_ID = "proactive_showcase";
 const inflight = new WeakMap<Store, Map<string, Promise<Showcase>>>();
@@ -62,25 +62,37 @@ async function refresh(store: Store, scope: string, now: Date): Promise<Showcase
   const selected = [...unique.values()].slice(0, 8);
   const signature = digest(JSON.stringify([1, window, versions(datasets), selected]));
   const prior = await store.get(scope, SHOWCASE_ID);
-  if (prior?.data.signature === signature && !prior.data.error) return prior.data as Showcase;
+  // A report with some failed metrics is kept, but retried after a pause.
+  if (prior?.data.signature === signature && !prior.data.error &&
+      !(prior.data.failed && prior.data.retryAt <= now.getTime())) return prior.data as Showcase;
   // Back off failures without replacing the last successful snapshot.
   if (prior?.data.failedSignature === signature && prior.data.retryAt > now.getTime())
     return { ...(prior.data as Showcase), stale: true };
-  const base: Showcase = { ...window, timezone: "UTC", signature, status: "empty", findings: [], measured: 0, skipped: 0 };
+  const base: Showcase = { ...window, timezone: "UTC", signature, status: "empty", findings: [], measured: 0, skipped: 0, failed: 0 };
   try {
     const ranked: (ShowcaseFinding & {score: number})[] = [];
     for (const spec of selected) {
       const dataset = datasets.find(d => d.id === spec.datasetId);
       const sql = dataset && weeklySql(spec, dataset, window);
       if (!dataset || !sql) { base.skipped++; continue; }
-      const result = await queryDatasets(store, scope, [dataset.id], sql, {limit: 1});
+      let result: Awaited<ReturnType<typeof queryDatasets>>;
+      // One metric that can't run must not blank the whole briefing.
+      try { result = await queryDatasets(store, scope, [dataset.id], sql, {limit: 1}); }
+      catch (e) {
+        console.error(`Showcase: "${spec.title}" in ${scope} failed:`, e instanceof Error ? e.message : e);
+        base.failed++; continue;
+      }
       if (result.citations[0]?.version !== dataset.data.activeVersion) throw Error("Data changed during analysis; retrying.");
       const row = result.rows[0];
       // Dates alone cannot prove ingestion completeness. Insufficient history
       // is omitted, and the UI labels this as observed records, not coverage.
       if (!row || !row.firstDate || String(row.firstDate).slice(0,10) > window.previousStart ||
-          !row.lastDate || String(row.lastDate).slice(0,10) < window.weekStart ||
-          row.current == null || row.previous == null) { base.skipped++; continue; }
+          !row.lastDate || row.current == null || row.previous == null) { base.skipped++; continue; }
+      if (!coversWeek(String(row.lastDate), window)) {
+        const lastDate = String(row.lastDate).slice(0, 10), stalled = (base.stalled ??= []);
+        if (!stalled.some(s => s.datasetId === dataset.id)) stalled.push({ datasetId: dataset.id, dataset: noun(dataset), lastDate });
+        continue;
+      }
       const current = Number(row.current), previous = Number(row.previous);
       const baseline = String(row.firstDate).slice(0,10) <= window.baselineStart && row.baseline != null ? Number(row.baseline) : null;
       if (![current, previous, ...(baseline === null ? [] : [baseline])].every(Number.isFinite)) { base.skipped++; continue; }
@@ -98,18 +110,23 @@ async function refresh(store: Store, scope: string, now: Date): Promise<Showcase
         score: change.score,
       });
     }
+    // Nothing could be queried (an executor outage, say): keep the last
+    // successful briefing rather than reporting "insufficient history".
+    if (base.failed && !base.measured) throw Error(`All ${base.failed} showcase metrics failed`);
     const latest = await metricsDatasets(store, scope);
     if (JSON.stringify(versions(latest)) !== JSON.stringify(versions(datasets))) throw Error("Data changed during analysis; retrying.");
     base.findings = ranked.sort((a,b) => b.score - a.score || a.id.localeCompare(b.id)).slice(0,3).map(({score, ...f}) => f);
     base.status = !datasets.length ? "empty" : base.measured ? "ready" : "insufficient";
     base.computedAt = now.toISOString();
+    const data = base.failed ? { ...base, retryAt: now.getTime() + 300000 } : base;
     await transaction(store, scope, async tx => {
       const old = await tx.get(SHOWCASE_ID);
-      if (old) tx.update(old, base);
-      else tx.put(resource(scope, "showcase", "Proactive Showcase", base, SHOWCASE_ID));
+      if (old) tx.update(old, data);
+      else tx.put(resource(scope, "showcase", "Proactive Showcase", data, SHOWCASE_ID));
     });
     return base;
-  } catch {
+  } catch (e) {
+    console.error(`Showcase: refresh of ${scope} failed:`, e instanceof Error ? e.message : e);
     const fallback: Showcase = prior?.data.computedAt
       ? { ...(prior.data as Showcase), stale: true, error: "Couldn’t refresh the showcase. Showing the last successful analysis." }
       : { ...base, status: "failed", stale: true, error: "Couldn’t analyse the current snapshots. Retrying automatically." };

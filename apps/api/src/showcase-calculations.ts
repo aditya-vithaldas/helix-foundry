@@ -9,6 +9,14 @@ export function showcaseWindow(now: Date) {
     previousStart: before(14), baselineStart: before(35),
   };
 }
+// A source that stopped syncing part-way through last week would otherwise
+// read as a sharp drop. Require records on the week's final day or later.
+// Very sparse data is skipped too; it can't support a 10% comparison anyway.
+export function coversWeek(lastDate: string, window: ReturnType<typeof showcaseWindow>) {
+  const lastDay = new Date(window.weekEnd + "T00:00:00Z");
+  lastDay.setUTCDate(lastDay.getUTCDate() - 1);
+  return lastDate.slice(0, 10) >= lastDay.toISOString().slice(0, 10);
+}
 export function relativeChange(current: number, previous: number): number | null {
   return previous === 0 ? null : (current - previous) / Math.abs(previous) * 100;
 }

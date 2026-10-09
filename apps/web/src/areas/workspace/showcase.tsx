@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowDownRight, ArrowUpRight, RefreshCw, Sparkles } from "lucide-react";
 import type { Showcase } from "../../../../../packages/shared/src/showcase";
@@ -58,9 +59,11 @@ export function ShowcasePage() {
         })}
       </div>}
       {!report.findings.length && !report.error && <EmptyState icon={Sparkles}
-        title={report.status === "empty" ? "Connect data to get your briefing" : report.status === "insufficient" ? "More weekly history needed" : "No notable weekly changes"}
+        title={report.status === "empty" ? "Connect data to get your briefing" : report.status === "insufficient" ? (report.stalled?.length ? "Last week’s data isn’t complete yet" : "More weekly history needed") : "No notable weekly changes"}
         text={report.status === "ready" ? `${report.measured} metrics compared; none crossed the highlight threshold.` : "Add dated records covering the comparison weeks. Highlights appear automatically when suitable snapshots are available."}
         action={<ButtonLink to={paths.data()}>Open Data</ButtonLink>} />}
+      {!!report.stalled?.length && <p className="sc-context">Left out because the records stop before the end of last week, which would read as a drop: {report.stalled.map((s, i) => <span key={s.datasetId}>{i ? ", " : ""}<Link to={paths.dataset(s.datasetId)}>{s.dataset}</Link> (latest record {s.lastDate})</span>)}. Check that the source is still syncing.</p>}
+      {!!report.failed && <p className="sc-context">{report.failed} {report.failed === 1 ? "metric" : "metrics"} couldn’t be calculated and will be retried automatically.</p>}
       {!!report.skipped && <p className="sc-context">{report.skipped} metrics omitted because their date history or definition could not support this comparison.</p>}
     </>}
   </Page>;

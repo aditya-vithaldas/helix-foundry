@@ -20,7 +20,10 @@ No new database, provider call or dependency is required.
 
 This is a descriptive heuristic, not statistical significance or proof of a
 cause. Sparse history is omitted conservatively. Observed record dates cannot
-prove complete source ingestion. A quiet interval within supported history
+prove complete source ingestion, so a dataset is only compared when it has
+records on the comparison week's last day or later. Otherwise a source that
+stopped syncing mid-week would read as a sharp drop; the page lists such
+datasets with their latest record date instead. A quiet interval within supported history
 counts as zero for sums/counts; missing averages remain unavailable.
 
 The first version uses temporal metric specs already selected for Home,
@@ -33,8 +36,11 @@ are possible follow-up changes.
 
 The cache key includes dataset versions, metric definitions and calendar week.
 Each query cites its snapshot. Refresh detects changes during analysis and
-preserves the previous successful result, retrying after one minute. Worker
-and page calls are coalesced per store/workspace.
+preserves the previous successful result, retrying after one minute.
+A metric whose query fails is logged and counted as failed; the others are
+still reported, and the report is retried after five minutes. When every
+metric fails, the previous successful result is kept as for any other failure.
+Concurrent refreshes of a workspace within one process are coalesced.
 
 Cards expose SQL, snapshot references, current/prior/baseline values, source
 data links and an Explore with Analyst action. The analyst receives the exact
@@ -45,36 +51,15 @@ The feature executes validated metric queries without sending rows to an AI
 provider. Explanations are deterministic; analyst exploration uses Helix's
 existing provider configuration when the user invokes it.
 
-## Applying the patch
+## Tests
 
-Prepared against HelixDB/helix-foundry commit
-48a161a57a09d2691e0a8b0dca93189bb74aee0f.
+`tests/showcase.test.ts` runs with `pnpm test` (and so in CI). It covers the
+week windows and thresholds, and runs the weekly SQL on the real DuckDB
+engine against an in-memory store: findings and caching, a stalled source,
+short history, partial and total query failures, and snapshot changes during
+analysis.
 
-From a checkout of that commit:
-
-    git apply --check /path/to/helix-proactive.patch
-    git apply /path/to/helix-proactive.patch
-
-Use the existing AGENTS.md development workflow with Node 24 and pnpm 10.7.0.
-Run pnpm typecheck, pnpm test and pnpm build before merging.
-The dependency-free focused checks can also run with:
-
-    node --experimental-vm-modules --test tests/showcase.standalone.mjs
-
-For end-to-end validation after dependencies are available: start an isolated
-test workspace, ingest dated data spanning six weeks, visit /showcase, and
-ingest a new version with changed historical records. Confirm the card values
-and snapshot evidence update; then disable the executor and confirm the last
-successful briefing is retained. Check navigation, Analyst exploration and a
-narrow viewport.
-
-## Validation performed in the preparation environment
-
-- Seven standalone regression checks passed against the actual TypeScript
-  calculation and refresh modules, with mocked store/query dependencies.
-- Web, API and worker entry points bundled successfully with esbuild,
-  resolving internal imports.
-- Full dependency installation was blocked by registry DNS access.
-- Full TypeScript checks, Vitest suite, DuckDB execution and browser validation
-  therefore remain required in a working Helix development environment.
-- No running Helix installation or upstream GitHub repository was modified.
+For end-to-end validation in the browser: ingest dated data spanning six
+weeks, visit /showcase, and ingest a new version with changed historical
+records. Confirm the card values and snapshot evidence update. Check
+navigation, Analyst exploration and a narrow viewport.
