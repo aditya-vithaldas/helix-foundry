@@ -95,7 +95,7 @@ describe("remaining time from processing velocity", () => {
       54,
     );
     expect(remainingSeconds(current, [sample(30000, 550)], 60000)).toBe(540);
-    expect(remainingLabel(90)).toBe("About 2–3 minutes remaining");
+    expect(remainingLabel(90)).toBe("~2–3 min remaining");
   });
   it("withholds estimates while stopped, stale, starting, or using another generation", () => {
     const current = sample(60000, 600);

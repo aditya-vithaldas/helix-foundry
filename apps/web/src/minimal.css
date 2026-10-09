@@ -1573,21 +1573,11 @@ td {
   font-size: 12px;
   margin-bottom: 14px;
 }
-.build-time-estimate {
-  display: grid;
-  gap: 6px;
-  margin-bottom: 20px;
-}
-.build-time-estimate strong {
-  font-size: 16px;
-  font-weight: 500;
-}
-.build-time-estimate p {
+.build-record-progress {
   font-size: 12px;
-}
-.build-time-estimate small {
-  font-size: 11px;
-  line-height: 1.5;
+  margin-bottom: 8px;
+  min-height: 18px;
+  font-variant-numeric: tabular-nums;
 }
 .build-progress-heading > span {
   font-variant-numeric: tabular-nums;
@@ -1601,23 +1591,12 @@ td {
 }
 .build-activity > span {
   display: block;
-  width: 35%;
   height: 100%;
   border-radius: inherit;
   background: #36b98a;
-  animation: build-activity 1.8s ease-in-out infinite;
 }
 .build-activity.is-paused > span {
-  animation-play-state: paused;
   background: var(--muted);
-}
-@keyframes build-activity {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(390%);
-  }
 }
 .build-stages {
   display: grid;
@@ -1645,11 +1624,6 @@ td {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .build-activity > span {
-    animation: none;
-    width: 100%;
-    opacity: 0.6;
-  }
   .build-stages .feed-step-mark {
     animation: none;
   }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import type { Resource } from "../../../packages/shared/src";
-import { number } from "./api";
+import { formatCompact } from "./kit/util";
 import {
   remainingSeconds,
   remainingLabel,
@@ -26,22 +26,33 @@ export function BuildProgress({
 }) {
   const [clock, setClock] = useState(Date.now);
   const [samples, setSamples] = useState<PublicationMeasurement[]>([]);
-  const measured: PublicationMeasurement | undefined =
+  const [estimate, setEstimate] = useState<{
+    runId: string;
+    generation: string;
+    label: string;
+  }>();
+  const incoming: PublicationMeasurement | undefined =
     run.data.publicationProgress;
+  // A missing poll must not remove the last known counts from the page.
+  const measured =
+    incoming ||
+    samples.findLast(
+      (sample) => sample.generation === run.data.publicationGeneration,
+    );
   useEffect(() => {
-    if (!measured) return;
+    if (!incoming) return;
     setSamples((previous) => {
-      if (previous.at(-1)?.sampledAt === measured.sampledAt) return previous;
+      if (previous.at(-1)?.sampledAt === incoming.sampledAt) return previous;
       return [
         ...previous.filter(
           (p) =>
-            p.generation === measured.generation &&
-            measured.sampledAt - p.sampledAt < 60000,
+            p.generation === incoming.generation &&
+            incoming.sampledAt - p.sampledAt < 60000,
         ),
-        measured,
+        incoming,
       ];
     });
-  }, [measured?.sampledAt, measured?.generation]);
+  }, [incoming?.sampledAt, incoming?.generation]);
   const working = ["queued", "running"].includes(run.data.status);
   useEffect(() => {
     if (!working) return;
@@ -61,40 +72,37 @@ export function BuildProgress({
     measured && !disconnected && working
       ? remainingSeconds(measured, samples, clock)
       : undefined;
+  const freshLabel =
+    remaining === undefined
+      ? undefined
+      : remaining > 0
+        ? remainingLabel(remaining)
+        : "Finishing publication…";
+  useEffect(() => {
+    if (!freshLabel || !measured) return;
+    setEstimate({
+      runId: run.id,
+      generation: measured.generation,
+      label: freshLabel,
+    });
+  }, [freshLabel, run.id, measured?.generation]);
+  const remainingText =
+    freshLabel ||
+    (estimate?.runId === run.id && estimate.generation === measured?.generation
+      ? estimate.label
+      : "Remaining: estimating…");
+  const recordPercent =
+    measured && measured.totalRecords > 0
+      ? Math.min(
+          100,
+          Math.max(
+            0,
+            Math.floor((100 * measured.records) / measured.totalRecords),
+          ),
+        )
+      : undefined;
   return (
     <section className="build-progress" aria-label="Workspace build progress">
-      {working && (
-        <div className="build-time-estimate">
-          <strong>
-            {remaining !== undefined && remaining > 0
-              ? remainingLabel(remaining)
-              : measured &&
-                  measured.records >= measured.totalRecords &&
-                  remaining === 0
-                ? "Finishing publication…"
-                : "Estimating time remaining…"}
-          </strong>
-          <p>
-            Your workspace is still building. It will open automatically when
-            ready.
-          </p>
-          {measured && (
-            <p className="muted">
-              {number(measured.records)} of {number(measured.totalRecords)}{" "}
-              records created
-              {measured.relationships > 0
-                ? ` · ${number(measured.relationships)} relationships created`
-                : ""}
-            </p>
-          )}
-          {remaining !== undefined && (
-            <small className="muted">
-              Rough estimate based on current processing speed, including
-              relationship work. Updates as the build progresses.
-            </small>
-          )}
-        </div>
-      )}
       <div className="build-progress-heading">
         <p role="status">
           {succeeded
@@ -106,23 +114,47 @@ export function BuildProgress({
         {/* A ticking timer is visual only; stage changes are announced. */}
         <span className="muted" aria-live="off">
           {duration} elapsed
+          {working && (
+            <>
+              {" "}
+              /{" "}
+              <span title="Approximate total time remaining, including relationships. The last estimate stays visible between measurements.">
+                {remainingText}
+              </span>
+            </>
+          )}
         </span>
       </div>
       {working && (
-        <div
-          className={`build-activity${disconnected ? " is-paused" : ""}`}
-          role="progressbar"
-          aria-label="Workspace build"
-          aria-valuetext={
-            disconnected
-              ? "Reconnecting to build status"
-              : active < 0
-                ? "Waiting to start"
-                : stages[active][1]
-          }
-        >
-          <span />
-        </div>
+        <>
+          <p className="build-record-progress muted" aria-live="off">
+            {measured && recordPercent !== undefined
+              ? `${formatCompact(measured.records)} / ${formatCompact(measured.totalRecords)} records · ${recordPercent}%`
+              : "Measuring progress…"}
+            {measured && measured.relationships > 0
+              ? ` · ${formatCompact(measured.relationships)} relationships`
+              : ""}
+          </p>
+          <div
+            className={`build-activity${disconnected ? " is-paused" : ""}`}
+            role="progressbar"
+            aria-label="Records created"
+            aria-valuemin={recordPercent === undefined ? undefined : 0}
+            aria-valuemax={recordPercent === undefined ? undefined : 100}
+            aria-valuenow={recordPercent}
+            aria-valuetext={
+              disconnected
+                ? "Reconnecting to build status"
+                : recordPercent !== undefined
+                  ? `${recordPercent}% of records created; workspace publication continues`
+                  : active < 0
+                    ? "Waiting to start"
+                    : stages[active][1]
+            }
+          >
+            <span style={{ width: `${recordPercent ?? 0}%` }} />
+          </div>
+        </>
       )}
       <ol className="feed-steps build-stages">
         {stages.map(([key, label], index) => {
@@ -161,10 +193,10 @@ export function BuildProgress({
         <p className="build-wait-note" role="status">
           Connection interrupted. Reconnecting to build status…
         </p>
-      ) : working && elapsed >= 60 ? (
+      ) : working ? (
         <p className="build-wait-note">
-          Publishing large datasets can take a while. You can leave this page;
-          the build continues in the background.
+          The build continues in the background. Your workspace opens when
+          ready.
         </p>
       ) : null}
     </section>
