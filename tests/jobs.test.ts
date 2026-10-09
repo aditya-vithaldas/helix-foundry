@@ -123,3 +123,60 @@ it("recovers an interrupted import lease without creating another operation", as
     stop();
   }
 });
+
+it("defers automatic refresh during a setup build and resumes it after completion", async () => {
+  const store = new MemoryStore(),
+    scope = "build-snapshot";
+  const before = imports.count;
+  await transaction(store, "global", async (tx) =>
+    tx.put(resource("global", "workspaceRef", "Build", {}, scope)),
+  );
+  await transaction(store, scope, async (tx) => {
+    tx.put(
+      resource(
+        scope,
+        "source",
+        "Source",
+        {
+          kind: "mysql",
+          secret: seal({ database: "fixture" }),
+          schedule: "* * * * *",
+          nextRun: 0,
+        },
+        "source",
+      ),
+    );
+    tx.put(
+      resource(
+        scope,
+        "run",
+        "Build",
+        {
+          task: "onboarding_build",
+          status: "running",
+          leaseUntil: Date.now() + 180000,
+        },
+        "build",
+      ),
+    );
+  });
+  const stop = startWorker(store);
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(await store.list(scope, "job")).toEqual([]);
+    expect(imports.count).toBe(before);
+    expect((await store.get(scope, "source"))?.data.nextRun).toBe(0);
+    await transaction(store, scope, async (tx) => {
+      const run = (await tx.get("build"))!;
+      tx.update(run, { ...run.data, status: "succeeded" });
+    });
+    for (let i = 0; i < 60 && imports.count === before; i++)
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(imports.count).toBe(before + 1);
+    expect((await store.get(scope, "source"))?.data.nextRun).toBeGreaterThan(
+      Date.now(),
+    );
+  } finally {
+    stop();
+  }
+});
