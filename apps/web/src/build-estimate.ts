@@ -32,11 +32,11 @@ export function remainingSeconds(
 
 export function remainingLabel(seconds: number) {
   const minutes = seconds / 60;
-  if (minutes < 1) return "About a minute remaining";
+  if (minutes < 1) return "~1 min remaining";
   if (minutes >= 90) {
     const hours = (scale: number) =>
       Math.max(0.5, Math.ceil((minutes * scale) / 30) / 2);
-    return `About ${hours(0.75)}–${hours(1.5)} hours remaining`;
+    return `~${hours(0.75)}–${hours(1.5)}h remaining`;
   }
   const round = (n: number) =>
     Math.max(
@@ -45,5 +45,5 @@ export function remainingLabel(seconds: number) {
     );
   const low = round(minutes * 0.75),
     high = round(minutes * 1.5);
-  return `About ${low}–${high} minutes remaining`;
+  return `~${low}–${high} min remaining`;
 }
