@@ -1573,6 +1573,22 @@ td {
   font-size: 12px;
   margin-bottom: 14px;
 }
+.build-time-estimate {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+.build-time-estimate strong {
+  font-size: 16px;
+  font-weight: 500;
+}
+.build-time-estimate p {
+  font-size: 12px;
+}
+.build-time-estimate small {
+  font-size: 11px;
+  line-height: 1.5;
+}
 .build-progress-heading > span {
   font-variant-numeric: tabular-nums;
 }

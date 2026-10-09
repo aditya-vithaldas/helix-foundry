@@ -1512,6 +1512,12 @@ export async function publishProposal(
   );
   const generation = randomUUID(),
     map = await datasetsMap(store, scope);
+  if (proposal.data.onboardingRunId)
+    await transaction(store, scope, async (tx) => {
+      const run = await tx.get(proposal.data.onboardingRunId);
+      if (run?.data.status === "running")
+        tx.update(run, { ...run.data, publicationGeneration: generation });
+    });
   const assets: Resource[] = [];
   for (const p of bundle.pipelines) {
     const preview = report.previews[pipelineId(p.name)] as any;

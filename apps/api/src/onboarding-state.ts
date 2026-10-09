@@ -4,6 +4,7 @@ import type {
 } from "../../../packages/shared/src/index.js";
 import { assert, digest } from "./security.js";
 import type { Store, Tx } from "./store.js";
+import { publicationProgress } from "./publication-progress.js";
 
 export const publicResource = (r: Resource) => {
   const { secret, ...data } = r.data;
@@ -12,7 +13,7 @@ export const publicResource = (r: Resource) => {
 };
 // One definition of readiness is used by the UI, generation, and atomic publication.
 export async function onboardingState(
-  store: Pick<Store, "get" | "list">,
+  store: Pick<Store, "get" | "list" | "publicationCounts">,
   scope: string,
 ): Promise<OnboardingState> {
   const workspace = await store.get(scope, "workspace");
@@ -147,6 +148,10 @@ export async function onboardingState(
           ([id, v]) =>
             !datasets.some((d) => d.id === id && d.data.activeVersion === v),
         ));
+  const measured =
+    buildRun &&
+    proposal &&
+    (await publicationProgress(store, scope, buildRun, proposal, datasets));
   return {
     step: m.step || (datasets.length ? "outcome" : provider ? "data" : "ai"),
     deferred: !!m.deferred,
@@ -164,7 +169,13 @@ export async function onboardingState(
     blockers,
     signature,
     recommendationRun,
-    buildRun,
+    buildRun:
+      buildRun && measured
+        ? {
+            ...buildRun,
+            data: { ...buildRun.data, publicationProgress: measured },
+          }
+        : buildRun,
     recommendations:
       recommendationRun?.data.onboardingSignature === signature &&
       recommendationRun.data.status === "succeeded"

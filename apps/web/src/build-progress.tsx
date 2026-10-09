@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import type { Resource } from "../../../packages/shared/src";
+import { number } from "./api";
+import {
+  remainingSeconds,
+  remainingLabel,
+  type PublicationMeasurement,
+} from "./build-estimate";
 
 const stages = [
   ["ontology", "Build records"],
@@ -19,6 +25,23 @@ export function BuildProgress({
   disconnected: boolean;
 }) {
   const [clock, setClock] = useState(Date.now);
+  const [samples, setSamples] = useState<PublicationMeasurement[]>([]);
+  const measured: PublicationMeasurement | undefined =
+    run.data.publicationProgress;
+  useEffect(() => {
+    if (!measured) return;
+    setSamples((previous) => {
+      if (previous.at(-1)?.sampledAt === measured.sampledAt) return previous;
+      return [
+        ...previous.filter(
+          (p) =>
+            p.generation === measured.generation &&
+            measured.sampledAt - p.sampledAt < 60000,
+        ),
+        measured,
+      ];
+    });
+  }, [measured?.sampledAt, measured?.generation]);
   const working = ["queued", "running"].includes(run.data.status);
   useEffect(() => {
     if (!working) return;
@@ -34,8 +57,44 @@ export function BuildProgress({
   const end = working ? clock : Date.parse(run.updatedAt);
   const elapsed = Math.max(0, Math.floor((end - started) / 1000)) || 0;
   const duration = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`;
+  const remaining =
+    measured && !disconnected && working
+      ? remainingSeconds(measured, samples, clock)
+      : undefined;
   return (
     <section className="build-progress" aria-label="Workspace build progress">
+      {working && (
+        <div className="build-time-estimate">
+          <strong>
+            {remaining !== undefined && remaining > 0
+              ? remainingLabel(remaining)
+              : measured &&
+                  measured.records >= measured.totalRecords &&
+                  remaining === 0
+                ? "Finishing publication…"
+                : "Estimating time remaining…"}
+          </strong>
+          <p>
+            Your workspace is still building. It will open automatically when
+            ready.
+          </p>
+          {measured && (
+            <p className="muted">
+              {number(measured.records)} of {number(measured.totalRecords)}{" "}
+              records created
+              {measured.relationships > 0
+                ? ` · ${number(measured.relationships)} relationships created`
+                : ""}
+            </p>
+          )}
+          {remaining !== undefined && (
+            <small className="muted">
+              Rough estimate based on current processing speed, including
+              relationship work. Updates as the build progresses.
+            </small>
+          )}
+        </div>
+      )}
       <div className="build-progress-heading">
         <p role="status">
           {succeeded
@@ -104,8 +163,8 @@ export function BuildProgress({
         </p>
       ) : working && elapsed >= 60 ? (
         <p className="build-wait-note">
-          Large datasets can take several minutes. You can leave this page; the
-          build continues in the background.
+          Publishing large datasets can take a while. You can leave this page;
+          the build continues in the background.
         </p>
       ) : null}
     </section>
