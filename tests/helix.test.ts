@@ -96,6 +96,21 @@ it.skipIf(process.env.TEST_HELIX !== "1")(
       expect(
         (await new HelixStore().get(scope, generation + "_1000"))?.name,
       ).toBe("1000");
+      // A realistic definition batch must still activate atomically through
+      // the guarded path after large append staging has completed.
+      await transaction(store, scope, async (tx) => {
+        const workspace = (await tx.get("workspace"))!;
+        tx.update(workspace, {
+          ...workspace.data,
+          activeGeneration: generation,
+        });
+        for (let i = 0; i < 32; i++)
+          tx.put(resource(scope, "objectType", "Type " + i, { generation }));
+      });
+      expect((await store.get(scope, "workspace"))?.data.activeGeneration).toBe(
+        generation,
+      );
+      expect(await store.list(scope, "objectType")).toHaveLength(32);
     } finally {
       const rows = await store.list(scope);
       for (let offset = 0; offset < rows.length; offset += 20)
