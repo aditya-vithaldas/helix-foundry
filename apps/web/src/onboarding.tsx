@@ -14,6 +14,7 @@ import {
 import { ConnectData } from "./connect-data";
 import { OntologyStep, datasetSource, entityNames } from "./ontology-step";
 import { AiWorkingScene } from "./ontology-scene";
+import { BuildProgress } from "./build-progress";
 import type {
   Resource,
   OnboardingUpdate,
@@ -306,6 +307,7 @@ export default function Onboarding() {
                 />
               </div>
             )}
+            <BuildProgress run={run} disconnected={!!q.error} />
             <OperationProgress
               operation={{
                 ...run,
