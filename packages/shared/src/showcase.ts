@@ -1,0 +1,32 @@
+export type ShowcaseFinding = {
+  id: string;
+  title: string;
+  datasetId: string;
+  dataset: string;
+  version: string;
+  sql: string;
+  format: "number" | "currency" | "percent";
+  current: number;
+  previous: number;
+  baseline: number | null;
+  delta: number;
+  changePercent: number | null;
+  baselinePercent: number | null;
+  direction: "up" | "down";
+  changed: boolean;
+};
+export type Showcase = {
+  status: "ready" | "empty" | "insufficient" | "failed";
+  signature: string;
+  computedAt?: string;
+  weekStart: string;
+  weekEnd: string;
+  previousStart: string;
+  baselineStart: string;
+  timezone: "UTC";
+  findings: ShowcaseFinding[];
+  measured: number;
+  skipped: number;
+  error?: string;
+  stale?: boolean;
+};

@@ -3,6 +3,7 @@ import SettingsPage from "../../settings";
 import Proposals from "../../review";
 import { Page } from "../../kit";
 export { HomePage } from "./home";
+export { ShowcasePage } from "./showcase";
 
 // /settings (?tab=models|team|developer)
 export function WorkspaceSettingsPage() {
@@ -20,3 +21,4 @@ export function ProposalsPage() {
     </Page>
   );
 }
+

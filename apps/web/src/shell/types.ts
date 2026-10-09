@@ -5,6 +5,7 @@ import type { LiveActivity } from "./live";
 // Sidebar sections, in shell/nav.ts.
 export type SectionId =
   | "home"
+  | "showcase"
   | "data"
   | "pipelines"
   | "ontology"
@@ -52,3 +53,4 @@ export type AreaShell = {
   subnav?: Partial<Record<SectionId, NavChild[]>>;
   palette?: PaletteSource[];
 };
+

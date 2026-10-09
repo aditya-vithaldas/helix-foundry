@@ -55,6 +55,7 @@ const item = (
 
 export const primaryNav: NavItem[] = [
   item("home", "/", "Home", House, []),
+  item("showcase", "/showcase", "Showcase", Sparkles, ["/showcase"]),
   // Ontology opens on its Explorer.
   item("ontology", "/ontology/explore", "Ontology", Shapes, [
     "/ontology",
@@ -85,3 +86,4 @@ export function childActive(pathname: string, child: NavChild) {
     (child.match || []).some((m) => under(pathname, m))
   );
 }
+

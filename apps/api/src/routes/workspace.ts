@@ -22,6 +22,7 @@ import {
 } from "../assistant.js";
 import { testProvider } from "../providers.js";
 import { homeMetrics, regenerateMetrics } from "../metrics.js";
+import { proactiveShowcase } from "../showcase.js";
 import {
   generationKinds,
   type RequestSchemas,
@@ -79,6 +80,10 @@ export function registerWorkspaceRoutes(
   deps: RouteDeps,
 ) {
   const { access, scrub, visibleIn } = deps;
+  app.get("/api/v1/workspaces/:w/showcase", async (req) => {
+    const a = await deps.access(req);
+    return proactiveShowcase(store, a.scope);
+  });
   // Home's growth and analytics metrics: picked once (by the AI when it is set
   // up) and re-run by code when the data changes.
   app.get("/api/v1/workspaces/:w/home/metrics", async (req) => {
@@ -597,3 +602,4 @@ export function registerWorkspaceRoutes(
     return { items };
   });
 }
+

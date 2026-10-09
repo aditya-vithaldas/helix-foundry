@@ -53,6 +53,7 @@ const data = () => import("./areas/data"),
   workspace = () => import("./areas/workspace");
 const Onboarding = lazy(() => import("./onboarding"));
 const HomePage = area(workspace, "HomePage"),
+  ShowcasePage = area(workspace, "ShowcasePage"),
   SettingsPage = area(workspace, "WorkspaceSettingsPage"),
   ProposalsPage = area(workspace, "ProposalsPage");
 // Data, Ontology and Analyst own their whole URL prefix: each area's *Routes
@@ -76,6 +77,7 @@ function WorkspaceRoutes() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/showcase" element={<ShowcasePage />} />
       <Route path="/data/*" element={<DataRoutes />} />
       <Route path="/sources" element={<Redirect to="/data" />} />
       <Route path="/explore" element={<Redirect to="/data" />} />
@@ -304,3 +306,4 @@ createRoot(document.getElementById("root")!).render(
     </QueryClientProvider>
   </React.StrictMode>,
 );
+

@@ -11,6 +11,7 @@ import { buildWorkspace, providerSettings, enqueue } from "./assistant.js";
 import { assert } from "./security.js";
 import { runSyncJob, runUploadJob } from "./data-jobs.js";
 import { runPipelineJob } from "./pipeline-jobs.js";
+import { proactiveShowcase } from "./showcase.js";
 // Queue, leases and retries live here; each job type's work lives with its area.
 const jobHandlers: Record<
   string,
@@ -175,6 +176,9 @@ export function startWorker(store: Store) {
           }
           break;
         }
+        // Snapshot signatures make this cheap when nothing changed. Run while
+        // idle, after imports/pipelines, even when the Showcase page is closed.
+        await proactiveShowcase(store, scope);
         const settings = await providerSettings(store, scope);
         if (
           settings.continuous &&
@@ -224,3 +228,4 @@ export function startWorker(store: Store) {
     await running;
   };
 }
+
