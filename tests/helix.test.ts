@@ -74,13 +74,21 @@ it.skipIf(process.env.TEST_HELIX !== "1")(
           ),
         ),
       );
-      await stage([
-        resource(scope, "relation", "links", {
-          generation,
-          from: generation + "_0",
-          to: generation + "_1000",
-        }),
-      ]);
+      const relationStart = Date.now();
+      await stage(
+        Array.from({ length: 500 }, (_, i) =>
+          resource(scope, "relation", "links", {
+            generation,
+            from: generation + "_" + i,
+            to: generation + "_" + (1000 - i),
+          }),
+        ),
+      );
+      console.info(
+        "500 staged relationships:",
+        Date.now() - relationStart,
+        "ms",
+      );
       expect(await store.version(scope)).toBe(version);
       expect((await store.get(scope, "workspace"))?.data.activeGeneration).toBe(
         "previous",
@@ -88,7 +96,7 @@ it.skipIf(process.env.TEST_HELIX !== "1")(
       expect(await store.publicationCounts(scope, generation)).toEqual({
         generation,
         records: 1001,
-        relationships: 1,
+        relationships: 500,
       });
       expect(await store.neighbors(scope, generation + "_0")).toEqual([
         generation + "_1000",
