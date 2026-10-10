@@ -193,6 +193,41 @@ export class HelixStore implements Store {
   // final generation activation continue to use revision-guarded commit().
   async stageRecords(scope: string, records: Resource[]) {
     if (!records.length) return;
+    // Resolve endpoints before constructing the mutation. Large batches of
+    // indexed traversals referenced by edge writes can produce expensive plans.
+    // Physical IDs keep indexed endpoint lookups out of the write plan.
+    const endpoints = [
+      ...new Set(
+        records
+          .filter((r) => r.kind === "relation")
+          .flatMap((r) => [r.data.from, r.data.to]),
+      ),
+    ];
+    const physical = new Map<string, number | bigint>();
+    for (let offset = 0; offset < endpoints.length; offset += 64) {
+      const keys = endpoints.slice(offset, offset + 64);
+      let lookup = readBatch();
+      const names = keys.map((key, i) => {
+        if (typeof key !== "string")
+          throw new Error("Missing staged relationship endpoint");
+        const name = "endpoint" + i;
+        lookup = lookup.varAs(
+          name,
+          anchor(scope + ":" + key)
+            .where(Predicate.eq("scopeKind", scope + ":object"))
+            .limit(2)
+            .id(),
+        );
+        return name;
+      });
+      const resolved = await this.read(lookup.returning(names));
+      for (const [i, key] of keys.entries()) {
+        const ids = resolved[names[i]];
+        if (ids?.length !== 1 || !["number", "bigint"].includes(typeof ids[0]))
+          throw new Error("Missing or ambiguous staged relationship endpoint");
+        physical.set(key, ids[0]);
+      }
+    }
     let q = writeBatch();
     for (const [i, record] of records.entries()) {
       q = q.varAs(
@@ -205,20 +240,21 @@ export class HelixStore implements Store {
         }),
       );
       if (record.kind === "relation") {
-        q = q
-          .varAs("from" + i, anchor(scope + ":" + record.data.from))
-          .varAs("to" + i, anchor(scope + ":" + record.data.to))
-          .varAs(
-            "edge" + i,
-            g()
-              .n(NodeRef.var("from" + i))
-              .addE("FoundryRelationship", NodeRef.var("to" + i), {
+        q = q.varAs(
+          "edge" + i,
+          g()
+            .n(NodeRef.id(physical.get(record.data.from)!))
+            .addE(
+              "FoundryRelationship",
+              NodeRef.id(physical.get(record.data.to)!),
+              {
                 scope,
                 generation: record.data.generation,
                 name: record.name,
                 relationId: record.id,
-              }),
-          );
+              },
+            ),
+        );
       }
     }
     await this.write(q.returning(["new0"]));
