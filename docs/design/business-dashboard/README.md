@@ -1,9 +1,11 @@
-# Business-aware dashboard — concept
+# Business-aware Home — concept
 
-Standalone HTML, open index.html directly in a browser. Illustrative values only; no actual scan or backend requests.
+Standalone HTML; open index.html directly in a browser. All finding and chart values are illustrative. No live scan or backend requests.
 
-Keep the four fundamentals. Below them show A few findings, one short callout, and one manually advanced carousel. Each slide has one headline and one short statement. Explanations, cohort definitions, evidence and limitations are collapsed behind Details. No auto rotation.
+The complete Home composition includes the Ask/search box, Some things we noticed, key metrics and trend/breakdown charts, workspace health, recent activity and ontology. The existing Home component patterns from home.tsx, metrics.tsx and home.css guide the lower sections; these are representative sample charts, not fetched live results.
 
-Uses the project warm paper, olive text, semantic light/dark tokens and bold-only emphasis. Demo controls illustrate scan activity and failure; previous findings remain available.
+Three compact findings appear side by side on desktop and one at a time in a manual phone carousel. Use subtle labelled icons for Positive, Warning and Issue. Mark a finding Important, dismiss it, or undo dismissal. Details contain explanations, evidence and limitations. No generic totals-are-steady callout and no business-understanding block. No automatic rotation. Tags/dismissals apply to the current preview session only.
 
-Checked JavaScript syntax, single visible slide, previous/next navigation and wraparound, optional evidence, scan failure/retry, theme switch and 390px overflow. This is a design proposal, not a shipped dashboard or detection engine. No main merge or deployment.
+Project paper/olive theme, semantic tokens and bold text emphasis are retained. Demo controls illustrate major scan stages and failure without discarding earlier findings.
+
+Validated JavaScript syntax, complete Home sections, three visible desktop cards, one visible phone card at 390px, no document overflow, carousel navigation, important tags, dismiss/undo, evidence disclosure, Ask preview submission, failure/retry and theme controls. This is a design proposal, not a deployed implementation or detection engine. No main merge.
