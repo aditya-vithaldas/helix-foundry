@@ -2,7 +2,7 @@
 
 Standalone, dependency-free HTML prototype. Open analyst-concept.html in a browser. Sample numbers and timing are illustrative. This is a design artifact, not a deployed product change.
 
-- Compact, dynamic preview: two to three major steps, expandable.
+- Compact, dynamic preview: two to three major steps, expandable. In both folded and expanded views, each step is one inline statement: bold step name followed by a normal-weight activity or outcome. Compact rows truncate to one line; expansion reveals the full text and wraps naturally on mobile.
 - Expansion contains four steps: understand the question, analyze orders, check results, write the answer. No tabs or separate calculation section.
 - Query details appear only inside the expansion and are themselves collapsed by default.
 - Highlight the primary answer and important quantities using bold text only; preserve the existing paper background.
