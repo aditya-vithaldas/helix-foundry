@@ -1,6 +1,6 @@
-import { DuckDBInstance } from "@duckdb/node-api";
+import { DuckDBInstance, type DuckDBConnection } from "@duckdb/node-api";
 import { createHash } from "node:crypto";
-import { mkdir, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, stat } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import type { DatasetProfile } from "../../../packages/shared/src/index.js";
 export const quote = (v: string) => '"' + v.replaceAll('"', '""') + '"';
@@ -32,15 +32,22 @@ export async function execute(
     throw new Error("Invalid storage identity");
   const out = resolve(root, "datasets", job.scope, `${job.version}.parquet`);
   await mkdir(dirname(out), { recursive: true });
-  const db = await DuckDBInstance.create(":memory:", {
-    memory_limit: process.env.DUCKDB_MEMORY || "512MB",
-    threads: "2",
-    allow_unsigned_extensions: "false",
-    autoinstall_known_extensions: "false",
-    autoload_known_extensions: "false",
-  });
-  const c = await db.connect();
+  const scratchRoot = resolve(root, "scratch");
+  await mkdir(scratchRoot, { recursive: true });
+  const scratch = await mkdtemp(resolve(scratchRoot, "executor-"));
+  let db: DuckDBInstance | undefined;
+  let c: DuckDBConnection | undefined;
   try {
+    db = await DuckDBInstance.create(":memory:", {
+      memory_limit: process.env.DUCKDB_MEMORY || "512MB",
+      threads: "2",
+      temp_directory: scratch,
+      max_temp_directory_size: "2GB",
+      allow_unsigned_extensions: "false",
+      autoinstall_known_extensions: "false",
+      autoload_known_extensions: "false",
+    });
+    c = await db.connect();
     if (job.mode === "ingest") {
       if (!job.file || !/^[-\w]+\.(csv|json|jsonl|parquet)$/.test(job.file))
         throw new Error("Invalid input file");
@@ -190,7 +197,8 @@ export async function execute(
     };
     return { profile, version: job.version, rows: sample };
   } finally {
-    c.closeSync();
-    db.closeSync();
+    c?.closeSync();
+    db?.closeSync();
+    await rm(scratch, { recursive: true, force: true });
   }
 }
