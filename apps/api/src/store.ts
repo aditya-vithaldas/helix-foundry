@@ -47,6 +47,7 @@ export interface Store {
   commit(scope: string, version: number, changes: Change[]): Promise<boolean>;
   version(scope: string): Promise<number>;
   neighbors(scope: string, id: string): Promise<string[]>;
+  stageRecords?(scope: string, records: Resource[]): Promise<void>;
   publicationCounts?(
     scope: string,
     generation?: string,
@@ -188,6 +189,76 @@ export class HelixStore implements Store {
       ? (JSON.parse(r.records[0].doc) as Resource)
       : undefined;
   }
+  // Fresh, inactive generation records need inserts only. Ordinary edits and
+  // final generation activation continue to use revision-guarded commit().
+  async stageRecords(scope: string, records: Resource[]) {
+    if (!records.length) return;
+    // Resolve endpoints before constructing the mutation. Large batches of
+    // indexed traversals referenced by edge writes can produce expensive plans.
+    // Physical IDs keep indexed endpoint lookups out of the write plan.
+    const endpoints = [
+      ...new Set(
+        records
+          .filter((r) => r.kind === "relation")
+          .flatMap((r) => [r.data.from, r.data.to]),
+      ),
+    ];
+    const physical = new Map<string, number | bigint>();
+    for (let offset = 0; offset < endpoints.length; offset += 64) {
+      const keys = endpoints.slice(offset, offset + 64);
+      let lookup = readBatch();
+      const names = keys.map((key, i) => {
+        if (typeof key !== "string")
+          throw new Error("Missing staged relationship endpoint");
+        const name = "endpoint" + i;
+        lookup = lookup.varAs(
+          name,
+          anchor(scope + ":" + key)
+            .where(Predicate.eq("scopeKind", scope + ":object"))
+            .limit(2)
+            .id(),
+        );
+        return name;
+      });
+      const resolved = await this.read(lookup.returning(names));
+      for (const [i, key] of keys.entries()) {
+        const ids = resolved[names[i]];
+        if (ids?.length !== 1 || !["number", "bigint"].includes(typeof ids[0]))
+          throw new Error("Missing or ambiguous staged relationship endpoint");
+        physical.set(key, ids[0]);
+      }
+    }
+    let q = writeBatch();
+    for (const [i, record] of records.entries()) {
+      q = q.varAs(
+        "new" + i,
+        g().addN("FoundryRecord", {
+          key: scope + ":" + record.id,
+          scope,
+          scopeKind: scope + ":" + record.kind,
+          doc: JSON.stringify(record),
+        }),
+      );
+      if (record.kind === "relation") {
+        q = q.varAs(
+          "edge" + i,
+          g()
+            .n(NodeRef.id(physical.get(record.data.from)!))
+            .addE(
+              "FoundryRelationship",
+              NodeRef.id(physical.get(record.data.to)!),
+              {
+                scope,
+                generation: record.data.generation,
+                name: record.name,
+                relationId: record.id,
+              },
+            ),
+        );
+      }
+    }
+    await this.write(q.returning(["new0"]));
+  }
   async version(scope: string) {
     const r = await this.read(
       readBatch()
@@ -214,9 +285,26 @@ export class HelixStore implements Store {
         ]),
       );
     }
-    const present = names.length
-      ? await this.read(existingQuery.returning(names))
-      : {};
+    let present: Record<string, any> = {};
+    if (names.length) {
+      try {
+        present = await this.read(existingQuery.returning(names));
+      } catch (error) {
+        // The pinned optimizer can reject independent indexed anchors in one
+        // read plan at large database sizes. Individual key lookups preserve
+        // upsert decisions and the atomic revision-guarded write below.
+        if (!String(error).includes("unsupported cascades plan")) throw error;
+        for (const [i, change] of changes.entries()) {
+          const id = "put" in change ? change.put.id : change.delete;
+          const result = await this.read(
+            readBatch()
+              .varAs("record", anchor(scope + ":" + id).valueMap(["key"]))
+              .returning(["record"]),
+          );
+          present["p" + i] = result.record;
+        }
+      }
+    }
     let q = writeBatch().varAs("clock", anchor(scope + ":__revision"));
     if (version === 0) {
       q = q.varAsIf(

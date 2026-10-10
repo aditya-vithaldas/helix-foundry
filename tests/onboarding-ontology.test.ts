@@ -487,8 +487,11 @@ it("finishes publishing once started and refuses Stop meanwhile", async () => {
   ).json();
   let stop: any;
   gate.onQuery = async (job) => {
-    // Publication stages records 500 rows at a time.
-    if (!stop && job.limit === 500)
+    // Attempt Stop while publication is actually running, independently of its page size.
+    if (
+      !stop &&
+      (await store.get(scope, state.buildRun.id))?.data.stage === "publishing"
+    )
       stop = await request(
         "POST",
         `/assistant/runs/${state.buildRun.id}/cancel`,

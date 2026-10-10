@@ -3,6 +3,8 @@ import {
   assertOnboardingPublication,
 } from "./onboarding-state.js";
 import { effectiveObject } from "./context.js";
+import { stagingWriter } from "./staged-publication.js";
+import { publicationScan } from "./publication-scan.js";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
@@ -1566,6 +1568,64 @@ export async function publishProposal(
     );
   }
   const identities = new Map<string, Map<string, string>>();
+  const stageRecords = stagingWriter(store, scope, generation);
+  const startedAt = now();
+  let records = 0,
+    relationships = 0,
+    sampledAt = 0;
+  let firstChecked = false;
+  let lastStaged: Resource | undefined;
+  const totalRecords = bundle.ontology.reduce(
+    (n, type) => n + (map.get(type.datasetId)?.data.profile.rows || 0),
+    0,
+  );
+  const estimatedRelationships = bundle.relationships.reduce((n, rel) => {
+    const type = bundle.ontology.find((type) => type.name === rel.fromType)!;
+    return n + (map.get(type.datasetId)?.data.profile.rows || 0);
+  }, 0);
+  const saveProgress = async (force = false) => {
+    if (
+      !proposal.data.onboardingRunId ||
+      (!force && Date.now() - sampledAt < 5000)
+    )
+      return;
+    sampledAt = Date.now();
+    await transaction(store, scope, async (tx) => {
+      const run = await tx.get(proposal.data.onboardingRunId);
+      if (run?.data.status === "running")
+        tx.update(run, {
+          ...run.data,
+          publicationProgress: {
+            generation,
+            records,
+            relationships,
+            totalRecords,
+            estimatedRelationships,
+            sampledAt,
+            startedAt,
+          },
+        });
+    });
+  };
+  const writeStaged = async (batch: Resource[]) => {
+    await stageRecords(batch);
+    if (batch.length && !firstChecked) {
+      const saved = await store.get(scope, batch[0].id);
+      assert(
+        JSON.stringify(saved?.data) === JSON.stringify(batch[0].data),
+        "Publication first batch was not stored correctly",
+      );
+      firstChecked = true;
+    }
+    if (batch.length) lastStaged = batch.at(-1);
+    records += batch.filter((record) => record.kind === "object").length;
+    relationships += batch.filter(
+      (record) => record.kind === "relation",
+    ).length;
+    await saveProgress();
+  };
+  await saveProgress(true);
+  const quote = (v: string) => '"' + v.replaceAll('"', '""') + '"';
   const manualObjects = await store.list(scope, "manualObject");
   const relationEdits = await store.list(scope, "relationEdit");
   const edits = new Map(
@@ -1583,17 +1643,16 @@ export async function publishProposal(
     assets.push(
       resource(scope, "objectType", type.name, { ...type, generation, typeId }),
     );
-    for (let offset = 0; offset < dataset.data.profile.rows; offset += 500) {
-      const r = await execute({
+    for await (const rows of publicationScan(
+      {
         mode: "query",
         scope,
         inputs: inputsFor([type.datasetId], map),
-        sql: `SELECT * FROM "${datasetTable(type.datasetId)}"`,
-        version: randomUUID(),
-        offset,
-        limit: 500,
-      });
-      const staged = r.rows.map((row) => {
+        sql: `SELECT * FROM ${quote(datasetTable(type.datasetId))} ORDER BY ${quote(type.primaryKey)}`,
+      },
+      dataset.data.profile.rows,
+    )) {
+      const staged = rows.map((row) => {
         const key = String(row[type.primaryKey]),
           logicalId = digest(typeId + ":" + key).slice(0, 32),
           obj = resource(
@@ -1614,10 +1673,9 @@ export async function publishProposal(
         lookup.set(key, obj.id);
         return obj;
       });
-      await transaction(store, scope, async (tx) => {
-        staged.forEach((o) => tx.put(o));
-      });
+      await writeStaged(staged);
     }
+    await saveProgress(true);
   }
   for (const o of manualObjects) {
     const lookup = identities.get(o.data.type);
@@ -1630,49 +1688,41 @@ export async function publishProposal(
         generation + "_" + o.data.logicalId,
       );
       lookup.set(o.data.key, staged.id);
-      await transaction(store, scope, async (tx) => tx.put(staged));
+      await writeStaged([staged]);
     }
   }
-  const quote = (v: string) => '"' + v.replaceAll('"', '""') + '"';
   for (const rel of bundle.relationships) {
     const fromType = bundle.ontology.find((o) => o.name === rel.fromType)!,
       toType = bundle.ontology.find((o) => o.name === rel.toType)!;
     const sql = `SELECT a.${quote(fromType.primaryKey)} AS from_key,b.${quote(toType.primaryKey)} AS to_key FROM ${quote(datasetTable(fromType.datasetId))} a JOIN ${quote(datasetTable(toType.datasetId))} b ON a.${quote(rel.fromColumn)}=b.${quote(rel.toColumn)}`;
-    let offset = 0,
-      total = Infinity;
-    while (offset < total) {
-      const r = await execute({
-        mode: "query",
-        scope,
-        inputs: inputsFor([fromType.datasetId, toType.datasetId], map),
-        sql,
-        version: randomUUID(),
-        offset,
-        limit: 500,
-      });
-      total = r.profile.rows;
-      await transaction(store, scope, async (tx) => {
-        for (const row of r.rows) {
-          const from = identities.get(rel.fromType)!.get(String(row.from_key)),
-            to = identities.get(rel.toType)!.get(String(row.to_key));
-          const edit =
-            from && to
-              ? edits.get(
-                  [
-                    from.slice(generation.length + 1),
-                    to.slice(generation.length + 1),
-                    rel.name,
-                  ].join(":"),
-                )
-              : undefined;
-          if (from && to && !edit)
-            tx.put(
-              resource(scope, "relation", rel.name, { from, to, generation }),
-            );
-        }
-      });
-      offset += 500;
+    for await (const rows of publicationScan({
+      mode: "query",
+      scope,
+      inputs: inputsFor([fromType.datasetId, toType.datasetId], map),
+      sql: `${sql} ORDER BY from_key, to_key`,
+    })) {
+      const staged: Resource[] = [];
+      for (const row of rows) {
+        const from = identities.get(rel.fromType)!.get(String(row.from_key)),
+          to = identities.get(rel.toType)!.get(String(row.to_key));
+        const edit =
+          from && to
+            ? edits.get(
+                [
+                  from.slice(generation.length + 1),
+                  to.slice(generation.length + 1),
+                  rel.name,
+                ].join(":"),
+              )
+            : undefined;
+        if (from && to && !edit)
+          staged.push(
+            resource(scope, "relation", rel.name, { from, to, generation }),
+          );
+      }
+      await writeStaged(staged);
     }
+    await saveProgress(true);
   }
   for (const edit of relationEdits) {
     const from = generation + "_" + edit.data.fromLogicalId,
@@ -1682,12 +1732,25 @@ export async function publishProposal(
       (await store.get(scope, from)) &&
       (await store.get(scope, to))
     )
-      await transaction(store, scope, async (tx) =>
-        tx.put(
-          resource(scope, "relation", edit.name, { from, to, generation }),
-        ),
-      );
+      await writeStaged([
+        resource(scope, "relation", edit.name, { from, to, generation }),
+      ]);
   }
+  if (lastStaged) {
+    const saved = await store.get(scope, lastStaged.id);
+    assert(
+      JSON.stringify(saved?.data) === JSON.stringify(lastStaged.data),
+      "Publication last batch was not stored correctly",
+    );
+  }
+  if (store.publicationCounts) {
+    const stored = await store.publicationCounts(scope, generation);
+    assert(
+      stored?.records === records && stored.relationships === relationships,
+      "Publication final stored counts did not match; workspace was not activated",
+    );
+  }
+  await saveProgress(true);
   for (const asset of assets)
     if (asset.kind === "objectType")
       asset.data.objectCount = identities.get(asset.name)?.size || 0;
