@@ -173,3 +173,7 @@ Helix Foundry is built for one person on their own computer. There are no accoun
 | [docs/HOSTING.md](docs/HOSTING.md)       | Neon, Supabase and PlanetScale sign-in, scopes and permissions                    |
 | [docs/API.md](docs/API.md)               | REST API reference, authentication and the TypeScript SDK                         |
 | [docs/VALIDATION.md](docs/VALIDATION.md) | Test results, benchmarks and known limits from the September 2026 validation runs |
+
+## License
+
+Helix Foundry is released under the [MIT License](LICENSE).
