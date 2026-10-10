@@ -5,7 +5,7 @@ Standalone, dependency-free HTML prototype. Open analyst-concept.html in a brows
 - Compact, dynamic preview: two to three major steps, expandable.
 - Expansion contains four steps: understand the question, analyze orders, check results, write the answer. No tabs or separate calculation section.
 - Query details appear only inside the expansion and are themselves collapsed by default.
-- Highlight the primary answer and important quantities with restrained mint emphasis.
+- Highlight the primary answer and important quantities using bold text only; preserve the existing paper background.
 - Show a useful chart and focused table with visible measures.
 - Timing hints in production must come from measured similar runs; otherwise show phase and elapsed time. The preview's 10–20 seconds is not a real service promise.
 - Reuse Helix tokens and docs/DESIGN.md conventions, including keyboard focus, dark mode and mobile wrapping.
