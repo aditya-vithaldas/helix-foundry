@@ -173,10 +173,26 @@
 @keyframes voice-breathe{50%{transform:scale(1.1)}}
 @media(prefers-reduced-motion:reduce){.voice-trigger .orb-mark{animation:none!important}}
 @media(max-width:700px){.ask-row{gap:4px}.ask-field{gap:7px}.provider-demo{white-space:nowrap}}
+
+/* Normal conversation; the only voice addition is the secondary composer orb. */
+main.chat-mode{padding-top:0;padding-bottom:0}
+.chat-view{display:flex;flex-direction:column;height:calc(100dvh - 86px);min-height:420px;max-width:760px;margin:auto}
+.chat-head{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--hf-border);padding:16px 0;gap:12px}
+.chat-head h1{font-family:var(--hf-font-display);font-weight:400;font-size:20px;margin:0}
+.chat-head p{font-size:11px;color:var(--hf-muted);margin:2px 0 0}
+.chat-log{flex:1;min-height:0;overflow:auto;padding:24px 0;display:flex;flex-direction:column;gap:24px}
+.chat-question{align-self:flex-end;max-width:90%;padding:10px 14px;border:1px solid var(--hf-border);border-radius:16px;background:var(--hf-sunken);font-size:14px;line-height:1.55}
+.chat-answer{display:flex;gap:12px;font-size:14px;line-height:1.7;max-width:95%}
+.chat-answer>span{color:var(--hf-muted);font-size:18px}.chat-answer p{margin:0}.chat-answer small{display:block;margin-top:8px;font-size:11px;color:var(--hf-muted)}
+.chat-answer.pending p{color:var(--hf-muted);font-size:12px}
+.chat-dock{padding:12px 0 10px;background:var(--hf-bg)}
+.chat-hint{margin:6px 0 0;text-align:center;font-size:11px;color:var(--hf-muted)}
+.voice-trigger[data-phase="thinking"] .orb-mark,.voice-trigger[data-phase="replying"] .orb-mark{animation:none;opacity:.6}
+@media(max-width:700px){.chat-view{height:calc(100dvh - 180px)}.chat-answer{max-width:100%}.chat-question{font-size:13px}}
 </style></head><body>
 <div class="demo"><span><strong>Dashboard concept</strong> · Illustrative data and scan activity. Voice input is simulated; microphone stays off. No backend requests.</span><div class="demo-controls"><label class="provider-demo">Provider <select id="preview-provider" aria-label="Preview AI provider"><option value="chatgpt">ChatGPT</option><option value="claude">Claude</option><option value="local">Local</option></select></label><button class="btn" id="replay">Replay scan</button><button class="btn" id="failed">Scan failure</button><button class="btn" id="theme" aria-label="Switch to dark theme">Dark theme</button></div></div>
 <div class="shell"><aside class="sidebar" aria-label="Workspace navigation"><div class="brand">h<span>elix foundry</span></div><div class="workspace">Meridian Commerce<span>Business workspace</span></div><nav class="nav"><a href="#home" aria-current="page">⌂ &nbsp; Home</a><a href="#findings">✧ &nbsp; Analyst</a><small>WORKSPACE</small><a href="#business">◇ &nbsp; Ontology</a><a href="#coverage">▤ &nbsp; Data</a><a href="#coverage">↗ &nbsp; Connections</a></nav><div class="sidebar-foot"><span class="status-dot"></span>13 datasets connected<br>Latest snapshot: 8 Oct 2026</div></aside>
-<main id="home"><header class="page-head"><div><div class="eyebrow">MERIDIAN COMMERCE / HOME</div><h1>Your business, at a glance.</h1></div><span class="period">2–8 Oct 2026 · latest available week</span></header><form class="home-ask" id="home-ask"><div class="ask-row"><div class="ask-field"><span aria-hidden="true">✧</span><input id="ask-input" aria-label="Ask anything about your data" placeholder="Ask anything about your data…" minlength="5" required><button class="btn primary" type="submit" aria-label="Ask Analyst">↑</button></div><button class="voice-trigger" type="button" id="voice-input" aria-label="Dictate question with ChatGPT" aria-pressed="false" title="Voice input · ChatGPT"><span class="orb-mark" aria-hidden="true"></span></button></div><div class="ask-suggestions"><button class="btn ghost suggestion" type="button">What changed this week?</button><button class="btn ghost suggestion" type="button">Which customers order most?</button><button class="btn ghost suggestion" type="button">Explore my data</button></div><p id="ask-result" class="ask-result" hidden role="status"></p></form>
+<main id="home"><div id="home-content"><header class="page-head"><div><div class="eyebrow">MERIDIAN COMMERCE / HOME</div><h1>Your business, at a glance.</h1></div><span class="period">2–8 Oct 2026 · latest available week</span></header><form class="home-ask" id="home-ask"><div class="ask-row"><div class="ask-field"><span aria-hidden="true">✧</span><input id="ask-input" aria-label="Ask anything about your data" placeholder="Ask anything about your data…" minlength="5" required><button class="btn primary" type="submit" aria-label="Ask Analyst">↑</button></div><button class="voice-trigger" type="button" id="voice-input" aria-label="Dictate question with ChatGPT" aria-pressed="false" title="Voice input · ChatGPT"><span class="orb-mark" aria-hidden="true"></span></button></div><div class="ask-suggestions"><button class="btn ghost suggestion" type="button">What changed this week?</button><button class="btn ghost suggestion" type="button">Which customers order most?</button><button class="btn ghost suggestion" type="button">Explore my data</button></div><p id="ask-result" class="ask-result" hidden role="status"></p></form>
 <section aria-labelledby="attention-heading" id="findings"><div class="section-head watch-title"><h2 id="attention-heading">Some things we noticed</h2><span class="tag" id="finding-count" hidden>1 of 3</span></div>
 <div class="scan" id="scan" aria-busy="false"><div class="scan-copy"><p id="scan-line"><strong>Scanned:</strong> Traffic, customers and orders.</p><p id="scan-line-two" hidden><strong>Business lens:</strong> Acquisition quality and dependence on established customers.</p></div><div class="scan-info"><span id="scan-status" hidden>Latest snapshot</span><button class="btn ghost" id="show-scan" aria-expanded="false" aria-controls="scan-list">Show steps ⌄</button></div></div>
 <div class="scan-list" id="scan-list" hidden><ol id="scan-steps"><li><strong>Understand the business:</strong> Connect visits, customers and purchasing.</li><li><strong>Establish the fundamentals:</strong> Compare complete weeks and fix the customer cohort.</li><li><strong>Look for meaningful shifts:</strong> Review mix and concentration beneath totals.</li></ol><p class="muted">This prototype illustrates the flow; it does not execute a scan.</p></div>
@@ -192,6 +208,12 @@
 <section class="ontology-panel" id="business"><header class="section-head"><div><h2>Ontology</h2><p class="muted">8 object types · connected business records</p></div><button class="btn ghost local-action">Open →</button></header><div class="ontology-content"><svg viewBox="0 0 440 260" role="img" aria-label="Sample ontology connecting customers, orders, order items, products, categories and regions"><g class="ontology-edges"><path d="M220 130 90 55M220 130 350 55M220 130 90 205M220 130 350 205M90 205 90 55M350 55 350 205"/></g><g class="ontology-nodes"><g><rect x="169" y="111" width="102" height="38" rx="8"/><text x="220" y="135">Order</text></g><g><rect x="37" y="36" width="106" height="38" rx="8"/><text x="90" y="60">Customer</text></g><g><rect x="295" y="36" width="110" height="38" rx="8"/><text x="350" y="60">Order item</text></g><g><rect x="37" y="186" width="106" height="38" rx="8"/><text x="90" y="210">Region</text></g><g><rect x="297" y="186" width="106" height="38" rx="8"/><text x="350" y="210">Product</text></g></g></svg><ul class="type-list"><li><span>Order item</span><strong>247,116</strong></li><li><span>Customer</span><strong>123,700</strong></li><li><span>Order</span><strong>82,372</strong></li><li><span>Product</span><strong>48,640</strong></li><li><span>Category</span><strong>40</strong></li><li><span>Region</span><strong>10</strong></li><li><span>Business event</span><strong>12</strong></li><li class="muted">1 more object type</li></ul></div></section><p class="page-foot" id="coverage">Home layout concept · chart values and findings are illustrative · no live scan</p>
 
 
+</div>
+<section id="chat-view" class="chat-view" aria-label="Analyst conversation" hidden>
+<header class="chat-head"><div><h1>Business shifts</h1><p>Analyst · same conversation</p></div><button class="btn ghost" id="back-home" type="button">Home</button></header>
+<div class="chat-log" id="chat-log" role="log" aria-label="Conversation" aria-live="polite"></div>
+<form id="chat-form" class="chat-dock"><div class="ask-row"><div class="ask-field"><input id="chat-input" aria-label="Chat follow-up" placeholder="Ask a follow-up…" minlength="5" required><button class="btn primary" type="submit" id="chat-send" aria-label="Send follow-up">↑</button></div><button class="voice-trigger" type="button" id="chat-voice" aria-label="Start hands-free voice with ChatGPT" aria-pressed="false" title="Hands-free voice · ChatGPT"><span class="orb-mark" aria-hidden="true"></span></button></div><p class="chat-hint" id="chat-hint">Illustrative conversation · no backend requests</p></form>
+</section>
 <div class="sr" id="announce" aria-live="polite"></div></main></div>
 <script>
 const $=id=>document.getElementById(id);let scanTimers=[],scanOpen=false,slide=0;const stages=[['Understand the business','Connect visits, customers and purchasing.'],['Establish the fundamentals','Compare complete weeks and fix the customer cohort.'],['Look for meaningful shifts','Review mix and concentration beneath totals.']];
@@ -214,21 +236,48 @@ matchMedia('(max-width:700px)').addEventListener('change',()=>showSlide(slide));
 function trend(id,values,currency=false){const w=400,h=184,left=40,right=10,top=10,bottom=25,max=currency?30000:300;const x=i=>left+i*(w-left-right)/(values.length-1),y=v=>top+(h-top-bottom)*(1-v/max);const line=values.map((v,i)=>(i?'L':'M')+x(i)+','+y(v)).join('');const ticks=[0,max/2,max];const svg='<svg viewBox="0 0 400 184" role="img" aria-label="Illustrative daily '+(currency?'net order value':'order count')+' for 2 to 8 October">'+ticks.map(v=>'<line class="chart-grid-line" x1="40" x2="390" y1="'+y(v)+'" y2="'+y(v)+'"/><text class="chart-axis" x="32" y="'+(y(v)+4)+'" text-anchor="end">'+(currency?'$'+v/1000+'K':v)+'</text>').join('')+'<path class="trend-area" d="'+line+'L390,159L40,159Z"/><path class="trend-line" d="'+line+'"/>'+values.map((v,i)=>'<circle cx="'+x(i)+'" cy="'+y(v)+'" r="3" fill="var(--wk-series)"><title>Oct '+(i+2)+': '+(currency?'$':'')+v.toLocaleString()+'</title></circle>').join('')+[0,3,6].map(i=>'<text class="chart-axis" x="'+x(i)+'" y="180" text-anchor="middle">Oct '+(i+2)+'</text>').join('')+'</svg>';$(id).innerHTML=svg+'<details class="chart-values"><summary>View values</summary><p>'+values.map((v,i)=>'Oct '+(i+2)+': '+(currency?'$':'')+v.toLocaleString()).join(' · ')+'</p></details>'}
 function breakdown(id,rows){const max=Math.max(...rows.map(r=>r[1]));$(id).innerHTML='<div class="chart-breakdown">'+rows.map(r=>'<div class="bar-pair"><span>'+r[0]+'</span><div class="track" aria-hidden="true"><div class="fill" style="--share:'+r[1]/max*100+'%"></div></div><span class="num">'+r[2]+'</span></div>').join('')+'</div>'}
 trend('value-chart',[22000,18000,26000,24000,19000,21000,20000],true);trend('orders-chart',[220,180,260,240,190,210,200]);breakdown('source-chart',[['Organic',15000,'15K'],['Paid',13000,'13K'],['Referral',12500,'12.5K'],['Direct',7000,'7K'],['Email',2500,'2.5K']]);breakdown('buyer-chart',[['Top ten',72000,'$72K'],['Other',78000,'$78K']]);
-$('home-ask').onsubmit=e=>{e.preventDefault();$('ask-result').hidden=false;$('ask-result').textContent='Prepared for Analyst: “'+$('ask-input').value+'” · preview only';};document.querySelectorAll('.suggestion').forEach(b=>b.onclick=()=>{$('ask-input').value=b.textContent;$('ask-input').focus()});document.querySelectorAll('.local-action').forEach(b=>b.onclick=()=>{$('notice').hidden=false;$('notice').textContent='This would open '+b.textContent.trim()+' in the workspace. Preview only.'});
+document.querySelectorAll('.suggestion').forEach(b=>b.onclick=()=>{stopVoice();$('ask-input').value=b.textContent;$('ask-input').focus()});document.querySelectorAll('.local-action').forEach(b=>b.onclick=()=>{$('notice').hidden=false;$('notice').textContent='This would open '+b.textContent.trim()+' in the workspace. Preview only.'});
 
-let voiceTimers=[],voiceSession=0,dictating=false;
-function stopVoice(){voiceTimers.forEach(clearTimeout);voiceTimers=[];voiceSession++;dictating=false;$('voice-input').setAttribute('aria-pressed','false');$('voice-input').setAttribute('aria-label','Dictate question with ChatGPT');}
-$('voice-input').onclick=()=>{
+
+let voiceTimers=[],voiceSession=0,voiceActive=false,voicePhase='off',voiceTurn=0,chatBusy=false;
+const utterances=['Why are our regular customers visiting less?','Which traffic sources changed?'];
+function activeInput(){return $('chat-view').hidden?$('ask-input'):$('chat-input')}
+function updateVoice(){
+ for(const id of ['voice-input','chat-voice']){const b=$(id);b.hidden=$('preview-provider').value!=='chatgpt';b.dataset.phase=voicePhase;b.setAttribute('aria-pressed',String(voiceActive));b.setAttribute('aria-label',voiceActive?'Stop hands-free voice':'Start hands-free voice with ChatGPT');b.title=voiceActive?'Voice '+voicePhase+' · click to stop':'Hands-free voice · ChatGPT';}
+ $('chat-hint').textContent=voiceActive?({listening:'Listening · finish speaking to send',thinking:'Thinking…',replying:'Responding…'}[voicePhase]||'Voice active')+' · simulated, microphone off':'Illustrative conversation · no backend requests';
+}
+function clearVoiceTimers(){voiceTimers.forEach(clearTimeout);voiceTimers=[];voiceSession++}
+function stopVoice(){clearVoiceTimers();voiceActive=false;voicePhase='off';updateVoice();$('announce').textContent='Hands-free voice stopped. You can continue typing.';}
+function later(fn,ms){const session=voiceSession;voiceTimers.push(setTimeout(()=>{if(session===voiceSession)fn()},ms))}
+function openChat(){ $('home-content').hidden=true;$('chat-view').hidden=false;$('home').classList.add('chat-mode'); }
+function addMessage(text,kind){const el=document.createElement('div');el.className=kind;if(kind==='chat-question'){el.textContent=text}else{const mark=document.createElement('span');mark.setAttribute('aria-hidden','true');mark.textContent='✧';const content=document.createElement('div'),p=document.createElement('p');p.textContent=text;content.append(p);el.append(mark,content);} $('chat-log').append(el);$('chat-log').scrollTop=$('chat-log').scrollHeight;return el}
+function sampleAnswer(question){if(/source|traffic|referral/i.test(question))return 'Organic visits fell from 20,000 to 15,000, while referral visits rose from 5,000 to 12,500. The total stayed at 50,000. The source mix changed underneath it.';return 'Visits from the fixed regular-customer cohort fell 25.3%. Other visitors offset the decline, so total traffic looked unchanged. The data shows the shift, but does not establish its cause.';}
+function submitChat(prompt){
+ if(chatBusy||prompt.trim().length<5)return;
+ openChat();addMessage(prompt,'chat-question');$('ask-input').value='';$('chat-input').value='';chatBusy=true;$('chat-send').disabled=true;
+ const reply=addMessage('Reviewing the available evidence…','chat-answer pending');
+ if(voiceActive){voicePhase='thinking';updateVoice()}
+ setTimeout(()=>{reply.classList.remove('pending');reply.querySelector('p').textContent=sampleAnswer(prompt);const note=document.createElement('small');note.textContent='Illustrative answer · Sessions, Customers · complete-week comparison';reply.lastElementChild.append(note);chatBusy=false;$('chat-send').disabled=false;$('chat-log').scrollTop=$('chat-log').scrollHeight;
+ if(voiceActive){voicePhase='replying';updateVoice();later(()=>{voicePhase='listening';updateVoice();if(voiceTurn<utterances.length)later(simulateUtterance,1800)},2000)}else $('chat-input').focus();
+ },1000);
+}
+function simulateUtterance(){
+ if(!voiceActive||chatBusy)return;voicePhase='listening';updateVoice();if(voiceTurn>=utterances.length)return;
+ const input=activeInput(),initial=input.value.trim(),words=utterances[voiceTurn++].split(' ');
+ words.forEach((word,i)=>later(()=>{input.value=(initial?initial+' ':'')+words.slice(0,i+1).join(' ')},200+i*180));
+ later(()=>{if(voiceActive&&input.value.trim())submitChat(input.value.trim())},1000+words.length*180);
+}
+function toggleVoice(){
  if($('preview-provider').value!=='chatgpt')return;
- if(dictating){stopVoice();$('ask-input').focus();return;}
- stopVoice();dictating=true;const session=voiceSession,initial=$('ask-input').value.trim(),words='Why are our regular customers visiting less?'.split(' ');
- $('voice-input').setAttribute('aria-pressed','true');$('voice-input').setAttribute('aria-label','Stop dictation');$('announce').textContent='Voice input preview started. Simulated words will fill the existing question box.';
- words.forEach((word,i)=>voiceTimers.push(setTimeout(()=>{if(session!==voiceSession)return;$('ask-input').value=(initial?initial+' ':'')+words.slice(0,i+1).join(' ');},200+i*230)));
- voiceTimers.push(setTimeout(()=>{if(session!==voiceSession)return;stopVoice();$('ask-input').focus();$('announce').textContent='Question ready. Edit it or send it using the usual chat button.';},400+words.length*230));
-};
-$('ask-input').addEventListener('input',()=>{if(dictating)stopVoice()});
-$('home-ask').addEventListener('submit',stopVoice);
-$('preview-provider').onchange=()=>{stopVoice();$('voice-input').hidden=$('preview-provider').value!=='chatgpt'};
-$('voice-input').addEventListener('keydown',e=>{if(e.key==='Escape'){stopVoice();$('ask-input').focus()}});
-document.querySelectorAll('.suggestion').forEach(b=>b.addEventListener('click',stopVoice));
+ if(voiceActive){stopVoice();activeInput().focus();return;}
+ if(chatBusy)return;clearVoiceTimers();voiceActive=true;voiceTurn=0;voicePhase='listening';updateVoice();$('announce').textContent='Hands-free preview active. A pause sends each simulated utterance; after the response it listens again.';simulateUtterance();
+}
+$('voice-input').onclick=toggleVoice;$('chat-voice').onclick=toggleVoice;
+for(const id of ['ask-input','chat-input']){$(id).addEventListener('input',()=>{if(voiceActive)stopVoice()});$(id).addEventListener('keydown',e=>{if(e.key==='Escape'&&voiceActive){stopVoice();e.preventDefault()}});}
+$('home-ask').onsubmit=e=>{e.preventDefault();if(chatBusy)return;if(voiceActive)clearVoiceTimers();submitChat($('ask-input').value.trim())};
+$('chat-form').onsubmit=e=>{e.preventDefault();if(chatBusy)return;if(voiceActive)clearVoiceTimers();submitChat($('chat-input').value.trim())};
+$('preview-provider').onchange=()=>{stopVoice();updateVoice()};
+$('back-home').onclick=()=>{stopVoice();$('chat-view').hidden=true;$('home-content').hidden=false;$('home').classList.remove('chat-mode');$('ask-input').focus()};
+updateVoice();
+if(location.hash==='#hands-free')toggleVoice();
 </script></body></html>
