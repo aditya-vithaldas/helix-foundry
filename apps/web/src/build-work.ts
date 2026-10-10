@@ -38,6 +38,7 @@ export function retainMeasurement(
   if (incoming.sampledAt < old.sampledAt) return old;
   return {
     ...incoming,
+    startedAt: old.startedAt,
     totalRecords: old.totalRecords,
     estimatedRelationships: old.estimatedRelationships,
     records: Math.max(old.records, incoming.records),

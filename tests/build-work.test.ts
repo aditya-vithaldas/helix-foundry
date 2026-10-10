@@ -51,11 +51,31 @@ describe("workspace build feedback", () => {
         relationships: 200,
         sampledAt: 70000,
         estimatedRelationships: 2000,
+        startedAt: new Date(50000).toISOString(),
       },
       "new",
     );
     expect(buildWork(next, false).percent).toBe(42);
+    expect(next?.startedAt).toBe(measurement.startedAt);
     expect(retainMeasurement(measurement, undefined, "other")).toBeUndefined();
+  });
+  it("measures a retried generation from its own start instead of the original run", () => {
+    const run = resource("one", "run", "build", {
+      status: "failed",
+      stage: "publishing",
+      publicationGeneration: "new",
+      publicationProgress: {
+        ...measurement,
+        startedAt: new Date(120000).toISOString(),
+      },
+    });
+    run.createdAt = new Date(0).toISOString();
+    run.updatedAt = new Date(180000).toISOString();
+    const html = renderToStaticMarkup(
+      createElement(BuildProgress, { run, disconnected: false }),
+    );
+    expect(html).toContain("1:00");
+    expect(html).not.toContain("3:00");
   });
   for (const status of ["running", "failed", "succeeded"])
     it(`renders distinct counts and ${status} state`, () => {

@@ -44,7 +44,9 @@ export function BuildProgress({
   const current = stageIndex(run.data.stage || latest?.stage || "");
   const active = current >= 0 ? current : stageIndex(latest?.stage || "");
   const succeeded = run.data.status === "succeeded";
-  const started = Date.parse(run.createdAt);
+  const started = Date.parse(
+    measured?.startedAt || run.data.startedAt || run.createdAt,
+  );
   const end = working ? clock : Date.parse(run.updatedAt);
   const elapsed = Math.max(0, Math.floor((end - started) / 1000)) || 0;
   const duration = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}`;
