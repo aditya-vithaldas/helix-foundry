@@ -186,6 +186,11 @@ main.chat-mode{padding-top:0;padding-bottom:0}
 .chat-answer>span{color:var(--hf-muted);font-size:18px}.chat-answer p{margin:0}.chat-answer small{display:block;margin-top:8px;font-size:11px;color:var(--hf-muted)}
 .chat-answer.pending p{color:var(--hf-muted);font-size:12px}
 .chat-dock{padding:12px 0 10px;background:var(--hf-bg)}
+.chat-live-controls{display:flex;justify-content:center;margin:0 0 8px}
+.chat-live-controls:has(button[hidden]){display:none}
+.chat-live-controls .voice-trigger{width:44px;height:36px}
+.chat-live-controls .orb-mark{width:24px;height:24px}
+#chat-voice[aria-pressed="true"] .orb-mark{opacity:1;background:radial-gradient(circle at 32% 26%,#eef8ff 0%,#80c5ff 26%,#368fe0 66%,#2464b4 100%);box-shadow:0 0 8px 3px #479feb66,0 0 20px 5px #479feb33;animation:voice-breathe 1.5s ease-in-out infinite}
 .chat-hint{margin:6px 0 0;text-align:center;font-size:11px;color:var(--hf-muted)}
 .voice-trigger[data-phase="thinking"] .orb-mark,.voice-trigger[data-phase="replying"] .orb-mark{animation:none;opacity:.6}
 @media(max-width:700px){.chat-view{height:calc(100dvh - 180px)}.chat-answer{max-width:100%}.chat-question{font-size:13px}}
@@ -212,7 +217,7 @@ main.chat-mode{padding-top:0;padding-bottom:0}
 <section id="chat-view" class="chat-view" aria-label="Analyst conversation" hidden>
 <header class="chat-head"><div><h1>Business shifts</h1><p>Analyst · same conversation</p></div><button class="btn ghost" id="back-home" type="button">Home</button></header>
 <div class="chat-log" id="chat-log" role="log" aria-label="Conversation" aria-live="polite"></div>
-<form id="chat-form" class="chat-dock"><div class="ask-row"><div class="ask-field"><input id="chat-input" aria-label="Chat follow-up" placeholder="Ask a follow-up…" minlength="5" required><button class="btn primary" type="submit" id="chat-send" aria-label="Send follow-up">↑</button></div><button class="voice-trigger" type="button" id="chat-voice" aria-label="Start hands-free voice with ChatGPT" aria-pressed="false" title="Hands-free voice · ChatGPT"><span class="orb-mark" aria-hidden="true"></span></button></div><p class="chat-hint" id="chat-hint">Illustrative conversation · no backend requests</p></form>
+<form id="chat-form" class="chat-dock"><div class="chat-live-controls"><button class="voice-trigger" type="button" id="chat-voice" aria-label="Start hands-free voice with ChatGPT" aria-pressed="false" title="Hands-free voice · ChatGPT"><span class="orb-mark" aria-hidden="true"></span></button></div><div class="ask-row"><div class="ask-field"><input id="chat-input" aria-label="Chat follow-up" placeholder="Ask a follow-up…" minlength="5" required><button class="btn primary" type="submit" id="chat-send" aria-label="Send follow-up">↑</button></div></div><p class="chat-hint" id="chat-hint">Illustrative conversation · no backend requests</p></form>
 </section>
 <div class="sr" id="announce" aria-live="polite"></div></main></div>
 <script>
