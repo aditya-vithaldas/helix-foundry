@@ -83,3 +83,41 @@ it("answers with tables named readably, loading every table the SQL names", asyn
     "order_items",
   ]);
 });
+
+it("keeps the table name of a dataset whose name is too long for an alias", async () => {
+  const id = (
+    await request("POST", "/ingest", {
+      name: "x".repeat(120),
+      rows: [{ id: 1 }],
+    })
+  ).json().id as string;
+  let seen: any;
+  vi.spyOn(Provider.prototype, "generate").mockImplementation(
+    async (system: string, context: any) => {
+      if (system.includes("Choose answer"))
+        return { value: { intent: "answer" }, tokens: 1 };
+      if (system.includes("Answer the question")) seen = context.datasets;
+      return {
+        value: system.includes("Summarise")
+          ? { summary: "One row.", highlights: [] }
+          : {
+              title: "Count",
+              sql: `SELECT count(*) n FROM "d_${id.replace(/-/g, "")}"`,
+              inputs: [id],
+              assumptions: [],
+            },
+        tokens: 1,
+      };
+    },
+  );
+  const run = (
+    await request("POST", "/assistant/runs", {
+      goal: "How many rows?",
+      intent: "auto",
+    })
+  ).json();
+  await buildWorkspace(store, scope, run.id);
+  const done = (await store.get(scope, run.id))!;
+  expect(done.data.status, done.data.error).toBe("succeeded");
+  expect(seen[0].table).toBe(`d_${id.replace(/-/g, "")}`);
+});

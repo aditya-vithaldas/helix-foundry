@@ -48,6 +48,10 @@ class FakeSocket {
   addEventListener(type: string, fn: (e: any) => void) {
     this.listeners.set(type, [...(this.listeners.get(type) || []), fn]);
   }
+  open() {
+    this.readyState = 1;
+    for (const fn of this.listeners.get("open") || []) fn({});
+  }
   emit(event: unknown) {
     for (const fn of this.listeners.get("message") || [])
       fn({ data: JSON.stringify(event) });
@@ -530,4 +534,88 @@ it("says a single answer aloud and gives a table only as a headline", () => {
   // It never asks the user to read the result.
   for (const text of [one, table])
     expect(text).not.toMatch(/read .* to you|ask the user to read/i);
+});
+
+it("shares one run between overlapping requests for the same question", async () => {
+  await useProvider("openai");
+  model([
+    { action: "ask", question: "What is total revenue?" },
+    { action: "ask", question: "What is total revenue?" },
+  ]);
+  await startSession();
+  const [a, b] = await Promise.all(
+    ["item_1", "item_2"].map(async (id) =>
+      (
+        await request("POST", `/live/sessions/live_123/delegations/${id}`, {})
+      ).json(),
+    ),
+  );
+  expect(a.runId).toBeTruthy();
+  expect(b.runId).toBe(a.runId);
+  expect(
+    (await store.list(scope, "run")).filter((r) => !r.data.task),
+  ).toHaveLength(1);
+});
+
+it("keeps results until the sideband is open, and waits for the user's words", async () => {
+  await useProvider("openai");
+  const generate = model([
+    { action: "ask", question: "What is total revenue?" },
+  ]);
+  Object.assign(liveTransport, { settleMs: 30, settleMaxMs: 400 });
+  const { socket } = await startSession();
+  socket.readyState = 0;
+  // The delegation arrives before any transcript; the words follow.
+  socket.emit({
+    type: "session.delegation.created",
+    delegation: { id: "item_1", target: "client" },
+  });
+  setTimeout(() => speak(socket, "What's our total revenue?", 1000), 10);
+  const c = (
+    await request("POST", "/live/sessions/live_123/delegations/item_1", {})
+  ).json();
+  const call = generate.mock.calls.find((x) =>
+    String(x[0]).includes("live voice conversation"),
+  )!;
+  expect((call[1] as any).transcript).toEqual([
+    "user: What's our total revenue?",
+  ]);
+  await work();
+  await new Promise((r) => setTimeout(r, 50));
+  expect(said(socket, "item_1")).toHaveLength(0);
+  socket.open();
+  await until(() => said(socket, "item_1").length);
+  expect(socket.of("session.thinking.append")).toHaveLength(1);
+  expect(c.runId).toBeTruthy();
+});
+
+it("counts reading each request against the daily budget", async () => {
+  await useProvider("openai");
+  const generate = model([{ action: "none" }]);
+  generate.mockImplementationOnce(async () => ({
+    value: { action: "none", question: "", clarification: "" },
+    tokens: 150,
+  }));
+  const { socket } = await startSession();
+  await request("POST", "/live/sessions/live_123/delegations/item_1", {});
+  const usage = await store.list(scope, "usage");
+  expect(usage[0].data.tokens).toBe(150);
+  // With the budget used up, no further model call is made.
+  await transaction(store, scope, async (tx) => {
+    const r = (await tx.get("provider"))!;
+    tx.update(r, {
+      ...r.data,
+      settings: { ...r.data.settings, dailyTokens: 1000 },
+    });
+    const u = (await tx.get(usage[0].id))!;
+    tx.update(u, { ...u.data, tokens: 5000 });
+  });
+  const calls = generate.mock.calls.length;
+  const blocked = (
+    await request("POST", "/live/sessions/live_123/delegations/item_2", {})
+  ).json();
+  expect(blocked.status).toBe("failed");
+  expect(blocked.error).toContain("daily AI budget");
+  expect(generate.mock.calls.length).toBe(calls);
+  expect(said(socket, "item_2")[0].content).toContain("daily AI budget");
 });

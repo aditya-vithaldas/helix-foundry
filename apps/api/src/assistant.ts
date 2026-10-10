@@ -378,6 +378,27 @@ export async function saveProposal(
     return p;
   });
 }
+// Model tokens used in the workspace today: runs, jobs and other AI calls
+// (such as voice) recorded as usage.
+export async function tokensToday(store: Store, scope: string) {
+  return [
+    ...(await store.list(scope, "run")),
+    ...(await store.list(scope, "job")),
+    ...(await store.list(scope, "usage")),
+  ]
+    .filter((r) => r.updatedAt.slice(0, 10) === now().slice(0, 10))
+    .reduce((n, r) => n + (r.data.tokens || 0), 0);
+}
+// Records tokens used outside a run, counted towards today's budget.
+export async function recordUsage(store: Store, scope: string, tokens: number) {
+  if (!tokens) return;
+  const id = "usage-" + now().slice(0, 10);
+  await transaction(store, scope, async (tx) => {
+    const r = await tx.get(id);
+    if (r) tx.update(r, { ...r.data, tokens: (r.data.tokens || 0) + tokens });
+    else tx.put(resource(scope, "usage", "AI usage", { tokens }, id));
+  });
+}
 export async function enqueue(
   store: Store,
   scope: string,
@@ -593,12 +614,7 @@ export async function buildWorkspace(store: Store, scope: string, id: string) {
       Date.now() - start < settings.timeoutSeconds * 1000,
       "Run time budget exhausted",
     );
-    const today = [
-      ...(await store.list(scope, "run")),
-      ...(await store.list(scope, "job")),
-    ]
-      .filter((r) => r.updatedAt.slice(0, 10) === now().slice(0, 10))
-      .reduce((n, r) => n + (r.data.tokens || 0), 0);
+    const today = await tokensToday(store, scope);
     assert(
       today < settings.dailyTokens,
       "Workspace daily token budget exhausted",
@@ -810,13 +826,16 @@ export async function buildWorkspace(store: Store, scope: string, id: string) {
       const readable = new Map<string, string>();
       {
         const count = new Map<string, number>();
+        // Names over 100 characters have no alias and keep their table name.
+        const aliasOf = (d: any) => datasetAliases(d.name).at(-1) || "";
         for (const d of context.datasets) {
-          const name = datasetAliases(d.name).at(-1)!.toLowerCase();
+          const name = aliasOf(d).toLowerCase();
           count.set(name, (count.get(name) || 0) + 1);
         }
         for (const d of context.datasets) {
-          const name = datasetAliases(d.name).at(-1)!;
+          const name = aliasOf(d);
           if (
+            name &&
             count.get(name.toLowerCase()) === 1 &&
             /^[a-z_][a-z0-9_]*$/i.test(name) &&
             name.toLowerCase() !== "result" &&

@@ -1,7 +1,13 @@
 import { z } from "zod";
 import type { Resource } from "../../../packages/shared/src/index.js";
 import type { Store } from "./store.js";
-import { enqueue, providerSettings, threadOf } from "./assistant.js";
+import {
+  enqueue,
+  providerSettings,
+  recordUsage,
+  threadOf,
+  tokensToday,
+} from "./assistant.js";
 import { Provider } from "./providers.js";
 import { AppError, assert, digest, redact } from "./security.js";
 
@@ -110,6 +116,11 @@ export type LiveSession = {
   tasks: Map<string, LiveTask>;
   // Outgoing append commands by event id, to time their acknowledgments.
   appends: Map<string, { delegationId: string | null; sentAt: number }>;
+  // Commands waiting for the sideband to open (or reopen).
+  outbox: string[];
+  attachments: number;
+  // Runs being started, by question, so overlapping requests share one.
+  starting: Map<string, Promise<{ runId: string; chatId: string }>>;
   createdAt: number;
   closed: boolean;
   closeReason?: string;
@@ -277,6 +288,9 @@ export function createLiveBridge(store: Store) {
       lastUserFragmentAt: 0,
       tasks: new Map(),
       appends: new Map(),
+      outbox: [],
+      attachments: 0,
+      starting: new Map(),
       createdAt: Date.now(),
       closed: false,
     };
@@ -292,6 +306,10 @@ export function createLiveBridge(store: Store) {
       { Authorization: "Bearer " + session.apiKey },
     );
     session.socket = socket;
+    session.attachments++;
+    socket.addEventListener("open", () => {
+      for (const command of session.outbox.splice(0)) socket.send(command);
+    });
     socket.addEventListener("message", (e: { data: unknown }) => {
       let event: any;
       try {
@@ -302,15 +320,25 @@ export function createLiveBridge(store: Store) {
       onEvent(session, event);
     });
     socket.addEventListener("close", () => {
-      if (session.socket === socket) session.socket = undefined;
+      if (session.socket !== socket) return;
+      session.socket = undefined;
+      // Dropped while the conversation goes on: reattach, a few times.
+      if (!session.closed && session.attachments < 4)
+        setTimeout(
+          () => !session.closed && !session.socket && attach(session),
+          1000,
+        ).unref?.();
     });
     socket.addEventListener("error", () => {});
   }
 
+  // Sends now, or once the sideband is open: a result is never dropped.
   function send(session: LiveSession, command: Record<string, unknown>) {
-    const socket = session.socket;
-    if (!socket || socket.readyState !== 1 || session.closed) return false;
-    socket.send(JSON.stringify(command));
+    if (session.closed) return false;
+    const socket = session.socket,
+      data = JSON.stringify(command);
+    if (socket?.readyState === 1) socket.send(data);
+    else if (session.outbox.length < 100) session.outbox.push(data);
     return true;
   }
   let sequence = 0;
@@ -393,7 +421,8 @@ export function createLiveBridge(store: Store) {
   async function settle(session: LiveSession) {
     const start = Date.now();
     for (;;) {
-      const quiet = Date.now() - session.lastUserFragmentAt;
+      // Words not yet heard at all count from the delegation.
+      const quiet = Date.now() - Math.max(session.lastUserFragmentAt, start);
       if (
         quiet >= liveTransport.settleMs ||
         Date.now() - start >= liveTransport.settleMaxMs
@@ -450,26 +479,33 @@ export function createLiveBridge(store: Store) {
     const pending = [...session.tasks.values()].filter(
       (t) => t !== task && t.question,
     );
-    const resolved = ResolveSchema.parse(
-      (
-        await new Provider({ ...settings, timeoutSeconds: 30 }).generate(
-          RESOLVE_PROMPT,
-          {
-            transcript: transcript(session),
-            chat: turns.map((r) => ({
-              question: r.data.goal,
-              answer: r.data.answer?.title,
-              status: r.data.status,
-            })),
-            voiceRequests: pending.map((t) => ({
-              question: t.question,
-              status: t.status,
-            })),
-          },
-          z.toJSONSchema(ResolveSchema),
-        )
-      ).value,
+    // Reading the request is a model call: it counts against the budget.
+    assert(
+      (await tokensToday(store, session.scope)) < settings.dailyTokens,
+      "The workspace's daily AI budget is used up.",
+      429,
     );
+    const reading = await new Provider({
+      ...settings,
+      timeoutSeconds: 30,
+    }).generate(
+      RESOLVE_PROMPT,
+      {
+        transcript: transcript(session),
+        chat: turns.map((r) => ({
+          question: r.data.goal,
+          answer: r.data.answer?.title,
+          status: r.data.status,
+        })),
+        voiceRequests: pending.map((t) => ({
+          question: t.question,
+          status: t.status,
+        })),
+      },
+      z.toJSONSchema(ResolveSchema),
+    );
+    await recordUsage(store, session.scope, reading.tokens);
+    const resolved = ResolveSchema.parse(reading.value);
     task.action = resolved.action;
     task.timings.resolved = Date.now() - task.receivedAt;
     if (resolved.action === "end") {
@@ -499,9 +535,15 @@ export function createLiveBridge(store: Store) {
     task.question = question;
     // The same question already asked in this session (a repeated event, a
     // reconnect, or speech interrupted mid-answer) reuses that run.
-    const same = pending.find(
-      (t) => t.runId && t.question && normal(t.question) === normal(question),
+    // Checked now, not before reading: another request may have started it.
+    const same = [...session.tasks.values()].find(
+      (t) =>
+        t !== task &&
+        t.runId &&
+        t.question &&
+        normal(t.question) === normal(question),
     );
+    const starting = session.starting.get(normal(question));
     // After a reconnect the new session has no tasks yet: the chat's latest
     // question, still running or just answered, is not run a second time.
     const last = turns.at(-1);
@@ -516,32 +558,19 @@ export function createLiveBridge(store: Store) {
       task.sharedWith = same.delegationId;
       task.runId = same.runId;
       task.chatId = same.chatId;
+    } else if (starting) {
+      Object.assign(task, await starting);
     } else if (recent) {
       task.runId = recent.id;
       task.chatId = session.chatId!;
     } else {
-      // A follow-up joins the chat through its latest question.
-      const latest = session.chatId
-        ? (await chatRuns(session.scope, session.chatId)).at(-1)
-        : undefined;
-      const r = await enqueue(
-        store,
-        session.scope,
-        question,
-        undefined,
-        {
-          page: "voice",
-          ...(latest ? { resourceId: latest.id } : {}),
-          voice: { sessionId: session.id, delegationId: task.delegationId },
-        },
-        false,
-        // Voice only answers questions; it never builds or changes anything.
-        "answer",
-        { userId: session.userId, readOnly: session.readOnly },
-      );
-      task.runId = r.id;
-      task.chatId = r.data.threadId || r.id;
-      session.chatId ||= task.chatId!;
+      const started = start(session, task, question);
+      session.starting.set(normal(question), started);
+      try {
+        Object.assign(task, await started);
+      } finally {
+        session.starting.delete(normal(question));
+      }
     }
     task.status = "running";
     task.timings.enqueued = Date.now() - task.receivedAt;
@@ -553,6 +582,32 @@ export function createLiveBridge(store: Store) {
     );
     void finish(session, task);
     return task;
+  }
+
+  // Starts the Analyst run for a question: a follow-up joins the chat
+  // through its latest question.
+  async function start(session: LiveSession, task: LiveTask, question: string) {
+    const latest = session.chatId
+      ? (await chatRuns(session.scope, session.chatId)).at(-1)
+      : undefined;
+    const r = await enqueue(
+      store,
+      session.scope,
+      question,
+      undefined,
+      {
+        page: "voice",
+        ...(latest ? { resourceId: latest.id } : {}),
+        voice: { sessionId: session.id, delegationId: task.delegationId },
+      },
+      false,
+      // Voice only answers questions; it never builds or changes anything.
+      "answer",
+      { userId: session.userId, readOnly: session.readOnly },
+    );
+    const chatId: string = r.data.threadId || r.id;
+    session.chatId ||= chatId;
+    return { runId: r.id, chatId };
   }
 
   // Waits for the Analyst run, then hands GPT-Live its verified result.
