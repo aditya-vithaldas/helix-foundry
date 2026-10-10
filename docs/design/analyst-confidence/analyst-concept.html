@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Helix · Analyst concept</title>
+<style>
+:root {
+  --hf-font-sans:
+    Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --hf-font-display: Georgia, "Times New Roman", serif;
+  --hf-font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --hf-text-xs: 11px;
+  --hf-text-sm: 12px;
+  --hf-text-base: 13px;
+  --hf-text-md: 14px;
+  --hf-text-lg: 16px;
+  --hf-text-xl: 20px;
+  --hf-text-2xl: 26px;
+  --hf-text-3xl: 34px;
+
+  --hf-space-05: 4px;
+  --hf-space-1: 8px;
+  --hf-space-15: 12px;
+  --hf-space-2: 16px;
+  --hf-space-3: 24px;
+  --hf-space-4: 32px;
+  --hf-space-5: 40px;
+  --hf-space-6: 48px;
+  --hf-space-8: 64px;
+
+  --hf-radius-sm: 6px;
+  --hf-radius: 8px;
+  --hf-radius-lg: 12px;
+  --hf-radius-xl: 16px;
+  --hf-radius-pill: 999px;
+
+  --hf-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --hf-duration: 160ms;
+  --hf-sidebar-width: 236px;
+  --hf-sidebar-collapsed: 60px;
+
+  /* Warm paper surfaces, olive ink and the onboarding mint. */
+  --hf-bg: #f8f7f3;
+  --hf-surface: #f8f7f3;
+  --hf-raised: #fdfcf9;
+  --hf-sunken: #f0efe9;
+  --hf-sidebar: #f1f0ea;
+  --hf-hover: #eceae2;
+  --hf-selected: #e5e7da;
+  --hf-overlay: rgba(41, 42, 38, 0.28);
+  --hf-border: #e4e2da;
+  --hf-border-strong: #d4d2c7;
+  --hf-text: #292a26;
+  --hf-text-2: #4f534a;
+  /* Secondary text; 4.5:1 or better on every surface, hover and selected. */
+  --hf-muted: #65675e;
+  /* Icons, borders and decoration only: too light for text. */
+  --hf-faint: #9b9d93;
+  --hf-ink: #343932;
+  --hf-ink-hover: #232721;
+  --hf-on-ink: #fbfaf6;
+  --hf-field: #fcfbf8;
+  /* 3:1 or better against every surface. */
+  --hf-focus: #2a8f69;
+
+  --hf-accent: #36b98a;
+  --hf-accent-strong: #2a9b72;
+  --hf-accent-soft: #e5f4ea;
+  --hf-accent-border: #c3e2cf;
+  --hf-accent-text: #2d6a4b;
+
+  --hf-success: #36b98a;
+  --hf-success-soft: #e5f4ea;
+  --hf-success-text: #2d6a4b;
+  --hf-warning: #c99a3e;
+  --hf-warning-soft: #f6efdd;
+  --hf-warning-text: #87662e;
+  --hf-danger: #b5503b;
+  --hf-danger-soft: #f7e9e4;
+  --hf-danger-text: #a44a36;
+  /* Text on solid danger fills (buttons, error toasts). */
+  --hf-on-danger: #ffffff;
+  --hf-info: #4f82b3;
+  --hf-info-soft: #e7eef6;
+  --hf-info-text: #36608a;
+
+  /* Categorical chart palette, in order. */
+  --hf-chart-1: #36b98a;
+  --hf-chart-2: #4f82b3;
+  --hf-chart-3: #c99a3e;
+  --hf-chart-4: #8a6fb0;
+  --hf-chart-5: #c85a43;
+  --hf-chart-6: #6f7a4f;
+
+  --hf-shadow-1: 0 1px 2px rgba(34, 35, 24, 0.05);
+  --hf-shadow-2:
+    0 1px 2px rgba(34, 35, 24, 0.04), 0 8px 24px rgba(34, 35, 24, 0.07);
+  --hf-shadow-3:
+    0 2px 6px rgba(34, 35, 24, 0.06), 0 24px 64px rgba(34, 35, 24, 0.16);
+}
+:root[data-theme="dark"] {
+  --hf-bg: #161713;
+  --hf-surface: #161713;
+  --hf-raised: #1e1f1a;
+  --hf-sunken: #121310;
+  --hf-sidebar: #1a1b17;
+  --hf-hover: #26281f;
+  --hf-selected: #2c3026;
+  --hf-overlay: rgba(0, 0, 0, 0.5);
+  --hf-border: #2e3029;
+  --hf-border-strong: #3d4036;
+  --hf-text: #ecebe4;
+  --hf-text-2: #c9c8be;
+  --hf-muted: #9c9d92;
+  --hf-faint: #6f7168;
+  --hf-ink: #e9e8df;
+  --hf-ink-hover: #ffffff;
+  --hf-on-ink: #1a1b16;
+  --hf-field: #1a1b17;
+  --hf-focus: #4fd0a0;
+  --hf-accent: #4fd0a0;
+  --hf-accent-strong: #6fdcb2;
+  --hf-accent-soft: #19362a;
+  --hf-accent-border: #28543f;
+  --hf-accent-text: #8fe3c4;
+  --hf-success: #4fd0a0;
+  --hf-success-soft: #19362a;
+  --hf-success-text: #8fe3c4;
+  --hf-warning: #e0b35a;
+  --hf-warning-soft: #3a2f18;
+  --hf-warning-text: #eac77f;
+  --hf-danger: #e47a62;
+  --hf-danger-soft: #3d201a;
+  --hf-danger-text: #f0a08d;
+  --hf-on-danger: #1a1b16;
+  --hf-info: #74a6d8;
+  --hf-info-soft: #1b2a3a;
+  --hf-info-text: #a3c6ea;
+  --hf-chart-1: #4fd0a0;
+  --hf-chart-2: #74a6d8;
+  --hf-chart-3: #e0b35a;
+  --hf-chart-4: #a98fd0;
+  --hf-chart-5: #e47a62;
+  --hf-chart-6: #a3ad7e;
+  --hf-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --hf-shadow-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --hf-shadow-3: 0 2px 6px rgba(0, 0, 0, 0.35), 0 24px 64px rgba(0, 0, 0, 0.55);
+}
+*{box-sizing:border-box}body{margin:0;background:var(--hf-bg);color:var(--hf-text);font:13px/1.55 var(--hf-font-sans)}button{font:inherit;cursor:pointer;color:inherit}button:focus-visible,summary:focus-visible{outline:2px solid var(--hf-focus);outline-offset:3px}button:disabled{cursor:default;opacity:.55}[hidden]{display:none!important}
+.concept{border-bottom:1px solid var(--hf-border);padding:12px 24px;display:flex;justify-content:space-between;gap:12px;align-items:center;background:var(--hf-raised)}.concept-label{font-size:12px;color:var(--hf-muted)}.controls{display:flex;gap:4px;flex-wrap:wrap}.btn{border:1px solid var(--hf-border);background:var(--hf-raised);border-radius:var(--hf-radius-sm);padding:5px 10px;min-height:28px;font-size:12px;display:inline-flex;gap:6px;align-items:center;justify-content:center}.btn:hover{background:var(--hf-hover)}.ghost{border-color:transparent;background:transparent}.ink{background:var(--hf-ink);color:var(--hf-on-ink);border-color:var(--hf-ink)}.ink:hover{background:var(--hf-ink-hover)}svg{width:14px;height:14px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+main{max-width:808px;padding:32px 24px 80px;margin:auto}.page-head{display:flex;justify-content:space-between;align-items:start;margin-bottom:40px}.breadcrumb{color:var(--hf-muted);font-size:12px;margin-bottom:8px}.page-head h1{font:26px/1.2 var(--hf-font-display);margin:0}.page-head p{color:var(--hf-muted);margin:6px 0 0}.thread-label{font-size:12px;color:var(--hf-muted);margin-bottom:8px}.question{display:flex;justify-content:flex-end;margin-bottom:28px}.question p{background:var(--hf-selected);border-radius:12px 12px 4px 12px;margin:0;padding:12px 16px;font-size:14px}.reply{display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px}.avatar{width:28px;height:28px;display:grid;place-items:center;border:1px solid var(--hf-accent-border);background:var(--hf-accent-soft);color:var(--hf-accent-text);border-radius:50%;margin-top:2px}.reply-body{min-width:0}.trace{margin-bottom:24px;border-top:1px solid var(--hf-border);border-bottom:1px solid var(--hf-border);padding:10px 0}.trace-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px}.trace-title{font-size:12px;font-weight:500;color:var(--hf-text-2);display:flex;gap:7px;align-items:center}.trace-meta{color:var(--hf-muted);font-size:11px;font-variant-numeric:tabular-nums}.trace-toggle{font-size:11px;white-space:nowrap}.trace-tools{display:flex;align-items:center;gap:4px}.dot{height:6px;width:6px;border-radius:50%;background:var(--hf-accent)}.trace.running .dot{background:var(--hf-info)}.trace.failed .dot{background:var(--hf-danger)}.compact{min-height:48px;display:grid;align-content:start;gap:3px}.compact p{margin:0;font-size:12px;line-height:21px;display:flex;gap:8px;align-items:center;color:var(--hf-muted)}.compact p.active{color:var(--hf-text)}.compact p svg{width:12px;height:12px;color:var(--hf-accent-text)}.compact p.active svg{color:var(--hf-info-text)}.trace.expanded .compact{display:none}.trace-content{padding-top:12px}.trace-tabs{display:flex;gap:12px;border-bottom:1px solid var(--hf-border);margin-bottom:12px}.tab{border:0;border-bottom:2px solid transparent;background:none;color:var(--hf-muted);font-size:12px;padding:4px 0 8px}.tab[aria-selected=true]{color:var(--hf-text);border-color:var(--hf-accent)}.timeline{list-style:none;margin:0;padding:0;display:grid;gap:12px}.step{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:8px;align-items:start}.step-mark{margin-top:2px;color:var(--hf-accent-text)}.step.pending{color:var(--hf-muted)}.step.pending .step-mark{color:var(--hf-faint)}.step.active .step-mark{color:var(--hf-info-text)}.step strong{font-weight:500;font-size:12px}.step p{font-size:12px;color:var(--hf-muted);margin:2px 0 0}.step time{font-size:11px;color:var(--hf-muted);font-variant-numeric:tabular-nums}.method p{margin:0 0 8px;font-size:12px;color:var(--hf-text-2)}.method dl{margin:0;display:grid;grid-template-columns:90px 1fr;gap:6px;font-size:12px}.method dt{color:var(--hf-muted)}.method dd{margin:0}.error{padding:12px 0;color:var(--hf-danger-text);font-size:12px}.error p{margin:0 0 8px}
+.answer h2{font-size:20px;line-height:1.4;font-weight:500;letter-spacing:-.2px;margin:0 0 8px}.answer-lead{margin:0;color:var(--hf-text-2);font-size:14px}.answer-lead strong{color:var(--hf-text);font-weight:600;font-variant-numeric:tabular-nums}.context{display:flex;gap:8px;align-items:center;flex-wrap:wrap;color:var(--hf-muted);font-size:12px;margin:8px 0 20px}.separator{color:var(--hf-faint)}.panel{background:var(--hf-raised);border:1px solid var(--hf-border);border-radius:var(--hf-radius-lg);overflow:hidden}.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid var(--hf-border)}.panel-head h3{font-weight:500;font-size:13px;margin:0}.switch{display:flex;gap:2px;background:var(--hf-sunken);border:1px solid var(--hf-border);padding:2px;border-radius:6px}.switch .btn{border:0;min-height:24px;padding:2px 8px;background:transparent}.switch .btn[aria-pressed=true]{background:var(--hf-raised);box-shadow:var(--hf-shadow-1)}.bars{list-style:none;padding:18px 16px;margin:0;display:grid;gap:16px}.bar-row{display:grid;grid-template-columns:18px 126px minmax(0,1fr) 38px;align-items:center;gap:10px;font-size:12px}.rank{font-size:11px;color:var(--hf-muted);font-variant-numeric:tabular-nums}.bar-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bar-track{background:var(--hf-sunken);height:10px;border-radius:3px;overflow:hidden}.bar-fill{height:100%;width:var(--width);background:var(--hf-chart-1);opacity:.55;border-radius:3px}.bar-row:first-child .bar-fill{opacity:1}.bar-value{text-align:right;font-weight:500;font-variant-numeric:tabular-nums}.panel-foot{padding:8px 16px;border-top:1px solid var(--hf-border);display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:var(--hf-muted)}table{width:100%;border-collapse:collapse;font-size:12px}th{font-weight:500;color:var(--hf-muted);background:var(--hf-sunken)}td,th{padding:10px 16px;text-align:left;border-bottom:1px solid var(--hf-border)}td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}tbody tr:last-child td{border-bottom:0}.table-wrap{overflow:auto}.sources{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:16px 0 8px;font-size:12px;color:var(--hf-muted)}.chip{font-size:11px;border:1px solid var(--hf-border);border-radius:99px;padding:3px 9px;display:inline-flex;gap:5px;align-items:center;background:var(--hf-raised)}.chip svg{width:11px;height:11px}.foot{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.disclosures{display:flex;gap:8px;flex-wrap:wrap}.disclosure{border-top:1px solid var(--hf-border);margin-top:12px;padding:12px 0;color:var(--hf-text-2);font-size:12px}.disclosure p{margin:0}.disclosure pre{white-space:pre-wrap;font:11px/1.7 var(--hf-font-mono);margin:0;background:var(--hf-sunken);padding:12px;border-radius:8px}.notice{font-size:11px;color:var(--hf-muted);margin:14px 0 0}.waiting{color:var(--hf-muted);font-size:13px;padding:16px 0}.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media(max-width:600px){.concept{padding:12px 16px;align-items:start;flex-direction:column;gap:8px}main{padding:24px 16px 48px}.page-head{margin-bottom:28px}.page-head h1{font-size:23px}.reply{grid-template-columns:22px minmax(0,1fr);gap:8px}.avatar{width:22px;height:22px}.avatar svg{width:12px;height:12px}.trace-head{flex-wrap:wrap}.trace-meta{font-size:10px}.trace-tools{margin-left:auto}.answer h2{font-size:18px}.bar-row{grid-template-columns:12px 100px minmax(0,1fr) 28px;gap:6px;font-size:11px}.bars{padding:16px 12px;gap:16px}.panel-head{padding:10px 12px}.panel-foot{padding:8px 12px}td,th{padding:8px 10px}.segment{display:none}.foot{gap:4px}.context{gap:5px;font-size:11px}.question p{font-size:13px}.compact p{font-size:11px}.trace-title{font-size:11px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.query-detail{border-top:1px solid var(--hf-border);margin-top:16px;padding-top:12px;font-size:12px;color:var(--hf-muted)}.query-detail summary{cursor:pointer;width:fit-content;color:var(--hf-text-2)}.query-detail p{font-size:11px;margin:8px 0}.query-detail pre{margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font:11px/1.7 var(--hf-font-mono);padding:12px;border:1px solid var(--hf-border);border-radius:8px;background:var(--hf-sunken);color:var(--hf-text-2)}
+.answer-insight{border:1px solid var(--hf-border);border-left:3px solid var(--hf-accent);border-radius:var(--hf-radius);background:var(--hf-raised);padding:14px 16px}.answer-insight h2{font-weight:600}.answer-lead mark{background:var(--hf-accent-soft);color:var(--hf-accent-text);border-radius:4px;padding:1px 4px;font-weight:600;font-variant-numeric:tabular-nums;box-decoration-break:clone;-webkit-box-decoration-break:clone}@media(max-width:600px){.answer-insight{padding:12px}.answer-insight h2{font-size:16px}.answer-lead{font-size:13px}}
+</style>
+</head>
+<body>
+<header class="concept"><span class="concept-label">Interactive concept · illustrative results and timings</span><div class="controls"><button class="btn ink" id="replay">Replay analysis</button><button class="btn" id="delay">Long wait</button><button class="btn" id="failure">Failure</button><button class="btn ghost" id="theme" aria-label="Switch to dark theme">Dark theme</button></div></header>
+<main>
+<div class="page-head"><div><div class="breadcrumb">Helix Foundry / Analyst</div><h1>Your data, explained.</h1><p>Ask a question. Explore the answer.</p></div></div>
+<div class="question"><p>Who has the most orders?</p></div>
+<section class="reply" aria-label="Analyst response">
+<div class="avatar" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2L12 3Z"/><path d="m20 2 .6 1.4L22 4l-1.4.6L20 6l-.6-1.4L18 4l1.4-.6L20 2Z"/></svg></div>
+<div class="reply-body">
+<section class="trace" id="trace" aria-label="Analysis trace">
+<div class="trace-head"><span class="trace-title"><span class="dot" aria-hidden="true"></span><span id="trace-label">Analysis complete</span></span><div class="trace-tools"><span class="trace-meta" id="timing">Answered in 14s</span><button class="btn ghost trace-toggle" id="expand" aria-expanded="false" aria-controls="trace-content">Show steps <span aria-hidden="true">⌄</span></button></div></div>
+<div class="compact" id="compact"></div>
+<div class="trace-content" id="trace-content" hidden>
+<ol class="timeline" id="timeline"></ol>
+<details class="query-detail" id="query-detail"><summary id="query-label">Query used</summary><p>Read-only query over Orders and Customers.</p><pre tabindex="0" aria-label="SQL query"><code>SELECT c.customer_id, c.customer_name,
+       COUNT(DISTINCT o.order_id) AS order_count
+FROM orders o
+JOIN customers c ON c.customer_id = o.customer_id
+WHERE o.order_date &gt;= DATE '2026-09-09'
+  AND o.order_date &lt; DATE '2026-10-09'
+GROUP BY c.customer_id, c.customer_name
+ORDER BY order_count DESC, c.customer_id
+LIMIT 10;</code></pre></details>
+</div>
+<div class="error" id="error" hidden><p>The query timed out. No answer was generated.</p><button class="btn" id="retry">Try again</button></div>
+</section>
+<div class="sr" role="status" aria-live="polite" id="announcement"></div>
+<p class="waiting" id="waiting" hidden>Your answer will appear here when the checks finish.</p>
+<article class="answer" id="answer">
+<div class="answer-insight"><h2>Lucas I. Kim has the most orders.</h2>
+<p class="answer-lead"><mark>42 orders</mark> in the selected period — <mark>8 more</mark> than the next customer.</p></div>
+<div class="context"><span>9 Sep–8 Oct 2026</span><span class="separator" aria-hidden="true">·</span><span>Ranked by order count</span></div>
+<section class="panel" aria-label="Customers ranked by order count">
+<div class="panel-head"><h3>Customers with the most orders</h3><div class="switch" aria-label="Result view"><button class="btn" id="chart-switch" aria-pressed="true">Chart</button><button class="btn" id="table-switch" aria-pressed="false">Table</button></div></div>
+<div id="chart-view"><ol class="bars" id="bars"></ol></div>
+<div id="table-view" class="table-wrap" hidden><table><caption class="sr">Customers ranked by orders, descending</caption><thead><tr><th scope="col">Rank</th><th scope="col">Customer</th><th scope="col" class="num">Orders</th><th scope="col" class="segment">Segment</th></tr></thead><tbody id="rows"></tbody></table></div>
+<div class="panel-foot"><span id="shown">Showing top 5 customers</span><button class="btn ghost" id="more" aria-expanded="false">Show top 10 <span aria-hidden="true">⌄</span></button></div>
+</section>
+<div class="sources"><span>Sources</span><span class="chip"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0"/></svg>Orders</span><span class="chip"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0"/></svg>Customers</span></div>
+<div class="foot"><div class="disclosures"><button class="btn ghost" data-disclosure="assumptions" aria-expanded="false" aria-controls="assumptions">Assumptions (2) ⌄</button></div><button class="btn ghost" id="save"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4V3Z"/></svg><span id="save-label">Save as view</span></button></div>
+<div class="disclosure" id="assumptions" hidden><p>Each distinct order is counted once. All order statuses are included; no status filter was requested.</p></div>
+
+<p class="notice">Sample values for this design preview. Saving affects this preview only.</p>
+</article>
+</div>
+</section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const check='<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg>';
+const circle='<svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 8v4l3 2"/></svg>';
+const empty='<svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg>';
+const steps=[
+ {name:'Understand the question',detail:'Rank customers by the number of orders they placed.',duration:'2s'},
+ {name:'Analyze the orders',detail:'Use Orders and Customers for the selected month.',duration:'7s'},
+ {name:'Check the results',detail:'Count distinct orders and verify the ranking.',duration:'3s'},
+ {name:'Write the answer',detail:'Summarize the leader and compare the top customers.',duration:'2s'}
+];
+const customers=[
+ ['Lucas I. Kim',42,'Business'],['Noah T. Mehta',34,'Loyalty'],['Elena B. Parker',31,'Business'],['Kai B. Nguyen',28,'Business'],['Hugo S. Chen',25,'Loyalty'],['Isla H. Garcia',23,'Loyalty'],['Amara H. Martin',21,'Consumer'],['Ava I. Bennett',19,'Loyalty'],['Oliver J. Reed',18,'Consumer'],['Mia S. Patel',16,'Business']
+];
+let state='complete',current=4,expanded=false,more=false,view='chart',started=0,timer=null,finishTimer=null,delayed=false,saved=false;
+function renderResults(){
+ const data=customers.slice(0,more?10:5);
+ $('bars').innerHTML=data.map((r,i)=>'<li class="bar-row"><span class="rank">'+(i+1)+'</span><span class="bar-name">'+r[0]+'</span><span class="bar-track" aria-hidden="true"><span class="bar-fill" style="display:block;--width:'+r[1]/42*100+'%"></span></span><span class="bar-value">'+r[1]+'<span class="sr"> orders</span></span></li>').join('');
+ $('rows').innerHTML=data.map((r,i)=>'<tr><td class="rank">'+(i+1)+'</td><td>'+r[0]+'</td><td class="num">'+r[1]+'</td><td class="segment">'+r[2]+'</td></tr>').join('');
+ $('shown').textContent='Showing top '+data.length+' customers';
+ $('more').innerHTML=(more?'Show top 5':'Show top 10')+' <span aria-hidden="true">'+(more?'⌃':'⌄')+'</span>';
+ $('more').setAttribute('aria-expanded',String(more));
+ $('chart-view').hidden=view!=='chart';$('table-view').hidden=view!=='table';
+ $('chart-switch').setAttribute('aria-pressed',String(view==='chart'));$('table-switch').setAttribute('aria-pressed',String(view==='table'));
+}
+function elapsed(){return Math.floor((Date.now()-started)/1000)}
+function renderTiming(){
+ $('timing').textContent=state==='complete'?'Answered in 14s':state==='failed'?'Stopped after 12s':delayed?'Longer than usual · '+elapsed()+'s elapsed':'About 10–20s · '+elapsed()+'s elapsed';
+}
+function renderTrace(){
+ $('trace').className='trace '+state+(expanded?' expanded':'');
+ $('trace-label').textContent=state==='complete'?'Analysis complete':state==='failed'?'Analysis stopped':'Analyzing your question';
+ $('trace-content').hidden=!expanded;
+ $('expand').setAttribute('aria-expanded',String(expanded));
+ $('expand').innerHTML=(expanded?'Hide steps':'Show steps')+' <span aria-hidden="true">'+(expanded?'⌃':'⌄')+'</span>';
+ if(state==='complete'){
+  $('compact').innerHTML='<p>'+check+'Checked the results.</p><p>'+check+'Wrote the answer.</p>';
+ }else{
+  const available=steps.slice(0,current+1),visible=available.slice(-3);
+  $('compact').innerHTML=visible.map((s,i)=>{const index=steps.indexOf(s),active=index===current;return '<p class="'+(active?'active':'')+'">'+(active?circle:check)+s.name+(active&&state==='failed'?' · interrupted':active?'…':'')+'</p>'}).join('');
+  // Two quiet lines at startup; no invented completed steps.
+  if(available.length===1)$('compact').innerHTML+='<p>'+empty+'Orders and Customers · selected month</p>';
+ }
+ $('timeline').innerHTML=steps.map((s,i)=>{const done=state==='complete'||i<current,active=i===current&&state!=='complete';return '<li class="step '+(active?'active':done?'':'pending')+'"><span class="step-mark">'+(done?check:active?circle:empty)+'</span><div><strong>'+s.name+'<span class="sr">'+(done?' — complete':active?state==='failed'?' — interrupted':' — in progress':' — not started')+'</span></strong><p>'+s.detail+'</p></div><time>'+(done?s.duration:active?state==='failed'?'Stopped':'In progress':'—')+'</time></li>'}).join('');
+ $('query-detail').hidden=state==='running'&&current<1;
+ $('query-label').textContent=state==='complete'?'Query used':state==='failed'?'Attempted query':'Query being checked';
+ $('error').hidden=state!=='failed';$('answer').hidden=state!=='complete';$('waiting').hidden=state!=='running';renderTiming();
+}
+function clearTimers(){clearInterval(timer);clearTimeout(finishTimer);timer=null;finishTimer=null}
+function start(long=false){
+ clearTimers();state='running';current=0;started=Date.now();delayed=false;renderTrace();$('announcement').textContent='Analysis started. About 10 to 20 seconds.';
+ timer=setInterval(()=>{const t=elapsed(),next=long&&t>=9?2:t<2?0:t<9?1:t<12?2:3;if(next!==current){current=next;renderTrace();$('announcement').textContent=steps[current].name}if(long&&t>=20&&!delayed){delayed=true;$('announcement').textContent='Taking longer than usual. The answer is still being checked.'}renderTiming()},1000);
+ if(!long)finishTimer=setTimeout(()=>{clearTimers();state='complete';current=4;renderTrace();$('announcement').textContent='Answer ready. Lucas I. Kim has the most orders.'},14000);
+}
+$('replay').onclick=()=>start();$('retry').onclick=()=>start();$('delay').onclick=()=>start(true);
+$('failure').onclick=()=>{clearTimers();state='failed';current=2;renderTrace();$('announcement').textContent='The query timed out. No answer was generated.'};
+$('expand').onclick=()=>{expanded=!expanded;renderTrace()};
+$('chart-switch').onclick=()=>{view='chart';renderResults()};$('table-switch').onclick=()=>{view='table';renderResults()};$('more').onclick=()=>{more=!more;renderResults()};
+for(const b of document.querySelectorAll('[data-disclosure]'))b.onclick=()=>{const target=$(b.dataset.disclosure);target.hidden=!target.hidden;b.setAttribute('aria-expanded',String(!target.hidden))};
+$('theme').onclick=()=>{const dark=document.documentElement.dataset.theme!=='dark';document.documentElement.dataset.theme=dark?'dark':'light';$('theme').textContent=dark?'Light theme':'Dark theme';$('theme').setAttribute('aria-label',dark?'Switch to light theme':'Switch to dark theme')};
+$('save').onclick=()=>{saved=!saved;$('save-label').textContent=saved?'Saved in preview':'Save as view';$('announcement').textContent=saved?'View saved in this preview only.':'Preview view removed.'};
+renderResults();renderTrace();
+</script>
+</body>
+</html>
