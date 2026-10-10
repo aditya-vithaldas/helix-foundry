@@ -266,6 +266,7 @@ export function VoiceProvider({
     retries = useRef(0),
     // A question was just typed on Home: its chat becomes this session's.
     adopt = useRef(false),
+    quiet = useRef<ReturnType<typeof setTimeout>>(undefined),
     path = useRef(pathname);
   path.current = pathname;
 
@@ -358,6 +359,9 @@ export function VoiceProvider({
               turn.current.assistantFresh = false;
               turn.current.userFresh = true;
               setCaption((t) => t + event.delta);
+              // Its words fade from the hint once it has stopped speaking.
+              clearTimeout(quiet.current);
+              quiet.current = setTimeout(() => setCaption(""), 6000);
               return;
             case "session.delegation.created":
               if (event.delegation?.id) void delegated(c, event.delegation.id);

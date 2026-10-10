@@ -285,7 +285,8 @@ it("answers a spoken question with a real Analyst run and speaks its result", as
   await work();
   await until(() => said(socket, "item_1").length);
   const spoken = said(socket, "item_1")[0].content;
-  expect(spoken).toContain("Revenue was $65 across 2 orders.");
+  // One value: said aloud with its number.
+  expect(spoken).toContain("Answer: revenue: 65");
   expect(spoken).toContain("Revenue excludes refunds");
   expect(spoken).toContain("Source: Orders");
   // The acknowledgment records delivery for latency reporting.
@@ -407,7 +408,7 @@ it("does not rerun the chat's latest question after a reconnect", async () => {
   expect(again.runId).toBe(first.runId);
   await work();
   await until(() => said(socket, "item_9").length);
-  expect(said(socket, "item_9")[0].content).toContain("Revenue was $65");
+  expect(said(socket, "item_9")[0].content).toContain("revenue: 65");
   expect(
     (await store.list(scope, "run")).filter((r) => !r.data.task),
   ).toHaveLength(1);
@@ -493,20 +494,40 @@ it("lets only the session's owner use it, and closes the sideband", async () => 
   ).toMatchObject({ closed: true, closeReason: "close_requested" });
 });
 
-it("never speaks figures the workspace keeps from the AI", () => {
-  const run = {
-    data: {
-      status: "succeeded",
-      answer: {
-        title: "Revenue by source",
-        rows: [{ source: "ads", revenue: 25 }],
-        total: 1,
-        citations: [{ name: "Orders" }],
+it("says a single answer aloud and gives a table only as a headline", () => {
+  const run = (rows: Record<string, unknown>[]) =>
+    ({
+      data: {
+        status: "succeeded",
+        answer: {
+          title: "Orders by region",
+          rows,
+          total: rows.length,
+          citations: [{ name: "Orders" }],
+        },
       },
-    },
-  } as unknown as Resource;
-  const quiet = resultText("Revenue by source?", run, false);
-  expect(quiet).not.toContain("25");
-  expect(quiet).toContain("do not state any numbers");
-  expect(resultText("Revenue by source?", run, true)).toContain('"revenue":25');
+    }) as unknown as Resource;
+  const one = resultText(
+    "Top region?",
+    run([{ region_name: "North America", order_count: "8473" }]),
+  );
+  expect(one).toContain(
+    "Answer: region name: North America, order count: 8473.",
+  );
+  expect(one).toContain("Say this answer aloud");
+  const table = resultText(
+    "Orders by region?",
+    run([
+      { region: "North America", orders: 8473 },
+      { region: "Europe", orders: 8100 },
+      { region: "Asia", orders: 7000 },
+    ]),
+  );
+  expect(table).toContain("a table of 3 rows, shown in the chat");
+  expect(table).toContain("First row: region: North America, orders: 8473");
+  expect(table).not.toContain("Europe");
+  expect(table).toContain("Do not read out the table");
+  // It never asks the user to read the result.
+  for (const text of [one, table])
+    expect(text).not.toMatch(/read .* to you|ask the user to read/i);
 });

@@ -58,6 +58,7 @@ Do not delegate to the backend when:
 - You need a brief clarification to understand what they want.
 
 Delegate before giving an answer that depends on business data. Never state, estimate or guess workspace numbers, names or trends unless the backend returned them. While waiting, you may briefly say you are checking; do not claim a result. If the backend says data is missing or a lookup failed, say so plainly.
+Never ask the user to read anything out to you, and never say you can't see the figures. Say the backend's answer aloud: for a single answer, say it with its numbers; for a table, give a one-sentence summary and say the details are in the chat below.
 Foundry cannot change data, records or settings by voice; it only answers questions.
 Keep listening while the user pauses to think. Do not treat a cough, music or nearby conversation as a new request.`;
 
@@ -550,16 +551,12 @@ export function createLiveBridge(store: Store) {
       task.delegationId,
       `Foundry is analysing: "${question}". No result yet; do not state figures until the result arrives.`,
     );
-    void finish(session, task, settings.allowRawData);
+    void finish(session, task);
     return task;
   }
 
   // Waits for the Analyst run, then hands GPT-Live its verified result.
-  async function finish(
-    session: LiveSession,
-    task: LiveTask,
-    allowRawData: boolean,
-  ) {
+  async function finish(session: LiveSession, task: LiveTask) {
     let r: Resource | null = null;
     for (;;) {
       if (session.closed) return;
@@ -569,7 +566,7 @@ export function createLiveBridge(store: Store) {
     }
     task.timings.finished = Date.now() - task.receivedAt;
     task.status = r?.data.status === "succeeded" ? "done" : "failed";
-    const content = resultText(task.question!, r, allowRawData);
+    const content = resultText(task.question!, r);
     // A newer request supersedes this one: GPT-Live may use the result, but
     // should not interrupt with it.
     const newer = [...session.tasks.values()].some(
@@ -685,14 +682,10 @@ export function createLiveBridge(store: Store) {
 }
 export type LiveBridge = ReturnType<typeof createLiveBridge>;
 
-// What GPT-Live may say about a finished run. Figures come only from the
-// run's own summary or rows, and only where the workspace lets results reach
-// the AI provider.
-export function resultText(
-  question: string,
-  run: Resource | null,
-  allowRawData: boolean,
-) {
+// What GPT-Live may say about a finished run, from the run's own result only.
+// A one-row answer is said in full; a table gets a one-line headline and the
+// details stay in the chat.
+export function resultText(question: string, run: Resource | null) {
   if (!run) return `The lookup for "${question}" is no longer available.`;
   const d = run.data;
   if (d.status === "canceled")
@@ -700,26 +693,33 @@ export function resultText(
   if (d.status !== "succeeded" || !d.answer)
     return `The lookup for "${question}" didn't complete${d.error ? `: ${redact(String(d.error)).slice(0, 200)}` : "."} No figures are available; offer to try again or rephrase.`;
   const a = d.answer,
+    rows: Record<string, unknown>[] = a.rows || [],
+    total = typeof a.total === "number" ? a.total : rows.length,
     sources = (a.citations || []).map((c: any) => c.name).join(", "),
     lines = [`Result for "${question}": ${a.title}.`];
-  if (a.summary) {
-    lines.push(a.summary);
-    for (const h of a.highlights || []) lines.push(`- ${h}`);
-  } else if (allowRawData && a.rows?.length) {
+  // "region_name: North America, order_count: 8473" in plain words.
+  const row = (r: Record<string, unknown>) =>
+    Object.entries(r)
+      .slice(0, 8)
+      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${String(v).slice(0, 80)}`)
+      .join(", ");
+  if (total === 0 || !rows.length)
     lines.push(
-      `First rows: ${JSON.stringify(a.rows.slice(0, 5)).slice(0, 700)}`,
+      "The query returned no rows: there is no matching data. Say so plainly.",
     );
-  } else if (!allowRawData) {
+  else if (total === 1)
     lines.push(
-      "The table is in the chat. This workspace does not share result values with the AI, so ask the user to read the figures on screen and do not state any numbers.",
+      `Answer: ${row(rows[0])}.`,
+      "Say this answer aloud in one short sentence, with its numbers.",
     );
-  }
-  if (a.total === 0)
-    lines.push("The query returned no rows: there is no matching data.");
+  else
+    lines.push(
+      `The result is a table of ${total} rows, shown in the chat.${a.summary ? ` Summary: ${a.summary}` : ""} First row: ${row(rows[0])}.`,
+      "Give a one-sentence headline (for example the total or the leading row) and say the details are in the chat below. Do not read out the table.",
+    );
   if (a.assumptions?.length)
     lines.push(`Caveats: ${a.assumptions.slice(0, 3).join("; ")}`);
   if (sources) lines.push(`Source: ${sources}.`);
-  lines.push("The full result is shown in the chat.");
   return lines.join("\n");
 }
 
