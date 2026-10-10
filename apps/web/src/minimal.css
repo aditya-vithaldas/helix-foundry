@@ -1579,6 +1579,11 @@ td {
   min-height: 18px;
   font-variant-numeric: tabular-nums;
 }
+.build-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 24px;
+}
 .build-progress-heading > span {
   font-variant-numeric: tabular-nums;
 }

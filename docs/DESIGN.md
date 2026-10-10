@@ -35,16 +35,17 @@ adding setup UI; workspace dark-mode tokens do not apply to onboarding.
 ## Progress and feedback
 
 - Drive stages and completion from server state. Show skipped stages as
-  “Not needed”; never invent a completion percentage. Label time estimates
-  clearly and derive them from measured processing speed, rather than a timer
-  or fixed duration for each stage.
+  “Not needed”. Label the overall work percentage as approximate: use fixed
+  rough duration shares (25% records, 70% relationships, 5% final checks),
+  driven by confirmed counts. Reserve 100% for server-confirmed readiness.
+  For builds without relationships, records occupy 95% of the work.
 - Show measured progress for known work, with compact counts such as
-  `233K / 4.3M records · 5%`. Label which work the percentage measures;
+  `Records: 233K / 4.3M` and `Relationships: 80K / ~748.9K`. Keep both counts visible;
   all records being written does not mean relationships and publication are done.
 - Keep the stage and timing together. Use supporting text, for example
-  `9:55 elapsed / ~2–4h remaining`, rather than a prominent estimate heading.
+  `9:55 elapsed / Remaining: relationships and final checks`.
 - Keep counts, elapsed time and remaining time in stable positions. Retain
-  the last known counts and rough estimate between polls; do not repeatedly
+  the last known counts and remaining phase between polls; do not repeatedly
   add and remove explanation blocks or use a continuously moving bar for
   measured work.
 - Explain long waits without promising a completion time. Distinguish a
@@ -56,13 +57,14 @@ adding setup UI; workspace dark-mode tokens do not apply to onboarding.
   and progress roles, and do not rely on color alone to convey status.
 - At narrow widths stack stages, wrap text, and avoid horizontal overflow.
 
-Time estimates should use recent processing velocity and actual work remaining.
-When some work is only approximately known, show a rounded range and explain
-that it updates. Start with “Estimating” until a rate is known. Refresh the
-rough estimate from valid measurements and retain the last range during a
-temporary gap; display a connection interruption separately. Reset retained
-counts and estimates for a new publication generation. A failed operation must
-remain visible even if its inputs change. Only server completion means ready.
+Show remaining work by phase rather than extrapolating record speed into
+relationship speed: “Remaining: records, relationships and final checks”, then
+“Remaining: relationships and final checks”, then “Remaining: final checks”.
+This keeps the text stable without promising a duration that changes with
+processing rates. Display connection interruptions separately. Retain confirmed
+counts and fixed totals through missing or out-of-order polls, and reset them
+for a new publication generation. A failed operation must remain visible even
+if its inputs change. Only server completion means ready.
 
 ## Workspace foundations
 
